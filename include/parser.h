@@ -12,6 +12,8 @@
 #include <iomanip>
 #include <stack>
 #include <sstream>
+#include <memory>
+#include <AST.h>
 
 const bool NON_TERMINATOR=1;
 const bool TERMINATOR = 0;
@@ -243,11 +245,7 @@ public:
 
 	std::stack<int> itemS;// item state
 	std::stack<word> symbolS;//
-
-    //semantic actions
-    std::tuple<word, std::string>(*p[229])();//pointer of semantic function
-    void init();
-    //
+    std::stack<std::shared_ptr<AST>> node_stack;
 
 	void get_LR1_table();
 	void print_LR1_table();
@@ -256,7 +254,7 @@ public:
 	void get_state_group_list();
 
 	void construct_closure(_item_group_& group);
-    std::tuple<bool,std::string,int,int> check(const std::string path);
+    std::tuple<bool,std::string,int,int> check(const std::string path,std::shared_ptr<AST>& root);
 	int read_cache();
 
 

@@ -875,79 +875,9 @@ int Parser::read_cache()
     return tag;
 }
 
-//we use the following command to generate the pic
-//neato -Tpng D://compilationprinciple/parser/parser/DFA.dot -o D://compilationprinciple//parser//parser//DFA.png
-void Parser::print_DFA()
-{
-    std::fstream of;
-    of.open("./DFA.dot", std::ios::out);
-
-    of << "digraph G{\n";
-
-    of << "graph[dpi=500, autosize=false,size=\"150,150\"];\n";
-
-    of << "overlap=false;\nspines=true;\n";
-
-    of << "node [shape=box];\n";
-    of<<"edge[lblstyle = \"above, sloped\"];\n";
-
-    for (const auto& unit : _item_groups_)
-    {
-        of << "node" << unit.id << "[label=\" ";
-
-        //write the items into a node
-        /*
-        for (auto item_unit : unit.items)
-        {
-            of << item_unit.base.left.name << " -> ";
-            for (unsigned int i = 0; i < item_unit.base.right_list.size(); i++)
-            {
-                if (i == item_unit.index)
-                    of << ".";
-                if (item_unit.base.right_list.at(i).name != "$")
-                    of << item_unit.base.right_list.at(i).name;
-            }
-            of << "  ";
-
-            //prospect symbol
-            for (auto prospect_unit : item_unit.prospect_symbols)
-                of << prospect_unit << " | ";
-            of << "\\n";
-        }
-        */
-        of << unit.id;
-        of << "\"]";
-        of << "\n";
-    }
-
-    //here we start to output the relationships between item_groups
-    of << "\n";
-
-    int cnt = 0;
-    for (const auto item_group_map : go_map)
-    {
-        for (const auto& go_relation : item_group_map)
-        {
-            std::string label = go_relation.first;
-            of << "node" << cnt << "->" << "node" << go_relation.second << "\n ";// [label = \"" << label << "\",constraint=false]\n";
-        }
-    }
-    of << "}";
-    of.close();
-}
-
-//semantic action
-bool _IsDigit(const string a)
-{
-    for (auto it : a)
-        if (!isdigit(it))
-            return false;
-    return true;
-}
-
 
 //TODO: MEND this function
-std::tuple<bool, std::string, int, int> Parser::check(const std::string path)
+std::tuple<bool, std::string, int, int> Parser::check(const std::string path,std::shared_ptr<AST>& root)
 {
     //track the max number of stack
       // 1
@@ -1000,7 +930,12 @@ std::tuple<bool, std::string, int, int> Parser::check(const std::string path)
                 if (a_ptr->dst == ACC)
                 {
                     of << "}\n";
-
+					
+					root=std::make_shared<AST>("","Program");
+					root->left_child=node_stack.top();
+					//root=node_stack.top();
+					node_stack.pop();
+					//root->name="translation_unit";
                     if(of.is_open())
                         of.close();
                     return std::make_tuple(true, "none", 0, 0);
@@ -1014,6 +949,10 @@ std::tuple<bool, std::string, int, int> Parser::check(const std::string path)
 
                     symbolS.push(inputw);
 
+
+					std::string content;// if this terminator is bool value or numerical value, we should get its true value
+					node_stack.push(std::make_shared<AST>(content,inputw.value,inputw.line,inputw.col));
+
                     if (itemS.size() > max_num)
                         max_num = itemS.size();
                     break;
@@ -1022,6 +961,10 @@ std::tuple<bool, std::string, int, int> Parser::check(const std::string path)
                 {//r
                     syntax_tag = false;
                     generator x = pure_generator_list[a_ptr->dst];
+
+					//unsigned int num_right=x.right_list.size();
+					std::shared_ptr<AST> new_node=std::make_shared<AST>();
+
                     nodeID++;
                     int fid = nodeID;
 
@@ -1029,23 +972,52 @@ std::tuple<bool, std::string, int, int> Parser::check(const std::string path)
                     word fword;
                     std::string type;
                     bool isTrans = false;
+					word topW;
                     of << "node" << nodeID << "[label=\"" << x.left.name << "\"]\n";
-                    /*-----------------------------*/
+
+					std::stack<std::shared_ptr<AST>> buffer;
                     if (x.right_list.at(0).name != "$")
                     {
                         int n = x.right_list.size();
                         for (int i = 0; i < n; i++)
                         {
-                            word topW = symbolS.top();
+                            topW = symbolS.top();
+							std::shared_ptr<AST> right_node=this->node_stack.top();
+							buffer.push(right_node);
                             
                             if (topW.line != LINEOFNONT)
                                 of << "node" << topW.id << "[label=\"" << topW.value << "\\n" << topW.realV << "\"]\n";
                             of << "node" << fid << "->node" << topW.id << "\n";
-
                             symbolS.pop();
                             itemS.pop();
-
+							node_stack.pop();
                         }
+
+						std::shared_ptr<AST> right_tmp;
+						//construct the grammer tree
+						for(int i=0;i<n;i++)
+						{
+							std::shared_ptr<AST> tmp=buffer.top();
+							buffer.pop();
+							if(i==0)
+							{
+								new_node->left_child=tmp;
+								right_tmp=new_node->left_child;
+							}
+							else
+							{
+								right_tmp->right_child=tmp;
+								right_tmp=right_tmp->right_child;
+							}
+						}
+						new_node->name=x.left.name;
+						if(n==1)
+						{
+							new_node->content=new_node->left_child->content;
+							
+							new_node->line=new_node->left_child->line;
+							new_node->col=new_node->left_child->col;
+						}
                     }
                     else
                     {
@@ -1058,6 +1030,7 @@ std::tuple<bool, std::string, int, int> Parser::check(const std::string path)
                     fword.setFid(fid);
                     fword.value = x.left.name;
                     symbolS.push(fword);
+					node_stack.push(new_node);
 
                     //goto
                     goto_struct* g_ptr = LR1_table[topState].goto_ptr->next;

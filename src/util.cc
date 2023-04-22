@@ -50,6 +50,53 @@ bool isLetter(char letter)
     return false;
  }
 
+ void print_tree(const std::shared_ptr<AST>& root,std::ofstream & o,unsigned int  layer)
+ {
+    if(layer==0)
+        o<<'{'<<'\n';
+    
+    for (int i=0;i<layer;i++)
+        o<<" ";
+    o<<"\""<<root->name<<"\""<<":\n";
+
+    for (int i=0;i<layer+1;i++)
+        o<<" ";
+    o<<"{\n";
+
+    if(root->left_child!=nullptr)
+    {
+        print_tree(root->left_child,o,layer+1);
+
+        std::shared_ptr<AST> start=root->left_child->right_child;
+        if(start!=nullptr)
+        {
+            for (int i=0;i<layer+1;i++)
+                o<<" ";
+            o<<",\n";
+        }
+        while(start!=nullptr)
+        {
+            print_tree(start,o,layer+1);
+            start=start->right_child;
+            if(start!=nullptr)
+            {
+                for (int i=0;i<layer+1;i++)
+                    o<<" ";
+                o<<",\n";
+            }
+        }
+        
+    }
+    o<<"\n";
+    for (int i=0;i<layer+1;i++)
+        o<<" ";
+    o<<"}\n";
+
+    if(layer==0)
+        o<<'}'<<'\n';
+    
+ }
+
 
  
  

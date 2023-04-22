@@ -3,6 +3,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <util.h>
 
 int main(int argc,char* argv[])
 {
@@ -38,8 +39,11 @@ int main(int argc,char* argv[])
 
     // parser.print_LR1_table();
 
+    std::shared_ptr<AST> root=nullptr;
 
-    auto r=parser.check("./token_result.tmp");
+    auto r=parser.check("./token_result.tmp",root);
+    std::ofstream o("tree.json");
+    print_tree(root,o,0);
 
     std::cout<<std::get<0>(r)<<' '<<std::get<1>(r);
     std::cout<<std::get<2>(r)<<' '<<std::get<3>(r);
