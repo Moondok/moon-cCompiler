@@ -217,57 +217,6 @@ public:
     }
 };
 
-
-class oneWord
-{
-public:
-    std::string type;
-    std::string name;
-    std::string value;
-
-    int offset;
-    oneWord(std::string type, std::string name, std::string value, int offset)
-    {
-        this->name = name;
-        this->type = type;
-        this->offset = offset;
-        this->value = value;
-    }
-};
-class sym_tbl
-{
-    std::string tblName;
-    std::string nextTblName;
-    sym_tbl* next_table;
-    std::vector<oneWord> syms;
-public:
-    sym_tbl(std::string tblName )
-    {
-        this->tblName = tblName;
-    }
-    void addsys(oneWord x)
-    {
-        syms.push_back(x);
-    }
-    std::string newTemp(std::string type, std::string value);
-
-    oneWord lookup(std::string name)
-    {
-
-        for (auto ite = syms.begin(); ite != syms.end(); ite++) {
-            //std::cout << ( * ite).name << std::endl;
-            if ((*ite).name == name) {
-                return *ite;
-            }
-        }
-        return oneWord("None","None","None",-1);
-    }
-
-};
-//-----------------------------------
-
-
-
 class Parser
 {
 public: 

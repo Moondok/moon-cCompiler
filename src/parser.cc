@@ -1,9 +1,4 @@
-
 #include <parser.h>
-//semantic global
-//---------------------------------------//
-std::stack<word> wordS;//temp store word
-std::stack<sym_tbl> tableS;//symbol table
 
 void Parser::read_grammer_Yacc(const std::string path)
 {
