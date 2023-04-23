@@ -226,6 +226,7 @@ std::tuple<bool, std::string, std::string> DigitAnalyzer::isAccepted(const std::
 
             else if (pos < str.size() && isHex(str.at(pos))) //0[xX]{H}+{IS}?    0[xX]{H}+{P}{FS}?    0[xX] {H} + "."{H}* {P} {FS} ? 
             {
+                type="CONSTANT_INT";
                 this->state = STATE_TERMINATE;
                 while (++pos < str.size() && isHex(str.at(pos)))//{H}+
                     ;

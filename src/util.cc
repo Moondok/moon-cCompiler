@@ -57,7 +57,11 @@ bool isLetter(char letter)
     
     for (int i=0;i<layer;i++)
         o<<" ";
-    o<<"\""<<root->name<<"\""<<":\n";
+    if(root->content.size())
+        o<<"\""<<root->name<<" ("<<root->content<<") "<<"\""<<":\n";
+    else
+        o<<"\""<<root->name<<"\""<<":\n";
+
 
     for (int i=0;i<layer+1;i++)
         o<<" ";

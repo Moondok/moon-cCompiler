@@ -42,6 +42,9 @@ int main(int argc,char* argv[])
     std::shared_ptr<AST> root=nullptr;
 
     auto r=parser.check("./token_result.tmp",root);
+    std::cout<<std::get<0>(r)<<' '<<std::get<1>(r);
+    std::cout<<std::get<2>(r)<<' '<<std::get<3>(r);
+    
     std::ofstream o("tree.json");
     print_tree(root,o,0);
 

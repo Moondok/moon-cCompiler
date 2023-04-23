@@ -164,7 +164,7 @@ void Parser::read_grammer_Yacc(const std::string path)
 	
 
 
-	std::cout << num_termi << " " << num_nontermi << "\n";
+	//std::cout << num_termi << " " << num_nontermi << "\n";
 	for (auto ite = this->non_terminators.begin(); ite != non_terminators.end(); ite++)
 	{
 		non_file << ite->name << "\n";
@@ -950,7 +950,33 @@ std::tuple<bool, std::string, int, int> Parser::check(const std::string path,std
                     symbolS.push(inputw);
 
 
-					std::string content;// if this terminator is bool value or numerical value, we should get its true value
+					std::string content=inputw.realV;// if this terminator is bool value or numerical value, we should get its true value
+					if(inputw.value=="CONSTANT_INT")
+					{
+						if(inputw.realV.size()>1&&inputw.realV.at(0)=='0'&&inputw.realV.at(1)!='x'&&inputw.realV.at(1)!='X')
+						{
+							int temp;
+							std::stringstream buffer(inputw.realV);
+							buffer>>std::oct>>temp;
+							std::cout<<"oct special copr"<<inputw.realV<<' '<<temp<<'\n';
+							inputw.realV=content=std::to_string(temp);
+						}
+						else if(inputw.realV.size()>1&&inputw.realV.at(0)=='0'&&(inputw.realV.at(1)=='x'||inputw.realV.at(1)=='X'))
+						{
+							int temp;
+							std::stringstream buffer(inputw.realV);
+							buffer>>std::hex>>temp;
+							std::cout<<"hex special copr"<<inputw.realV<<' '<<temp<<'\n';
+							inputw.realV=content=std::to_string(temp);
+						}
+						
+					}
+					else if (inputw.value=="TRUE")
+						inputw.realV=content="1";
+					else if(inputw.value=="FALSE")
+						inputw.realV=content="0";
+					else if(inputw.value=="STRING_LITERAL")
+						inputw.realV=content=inputw.realV.substr(1,inputw.realV.size()-2);
 					node_stack.push(std::make_shared<AST>(content,inputw.value,inputw.line,inputw.col));
 
                     if (itemS.size() > max_num)
