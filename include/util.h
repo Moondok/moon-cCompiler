@@ -4,6 +4,7 @@
 #include <AST.h>
 #include <fstream>
 #include <memory>
+#include <sstream>
 
 /*********************判断是否为字母********************/
 bool isLetter(char letter);

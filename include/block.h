@@ -11,6 +11,8 @@ public:
     std::string name;
     std::string type;
     unsigned int id;
+    var_node(std::string n,std::string t,unsigned int i=-1):name(n),type(t),id(i){};
+    var_node():name(""),type(""),id(-1){};
 };
 
 class func_node

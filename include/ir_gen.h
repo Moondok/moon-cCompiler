@@ -30,7 +30,37 @@ void analyze_parameter_declaration(std::shared_ptr<AST> root,const std::string &
 
 var_node analyze_assignment_expression(std::shared_ptr<AST> assign_exp);
 
+var_node analyze_logical_or_expression(const std::shared_ptr<AST>& logical_or_exp);
+
+var_node analyze_logical_and_expression(const std::shared_ptr<AST> &logical_and_exp);
+
+var_node analyze_inclusive_or_expression(const std::shared_ptr<AST> &inclusive_or_exp);
+
+var_node analyze_exclusive_or_expression(const std::shared_ptr<AST> &exclusive_or_exp);
+
+var_node analyze_and_expression(const std::shared_ptr<AST> & and_exp);
+
+var_node analyze_equality_expression(const std::shared_ptr<AST> &  equality_exp);
+
+var_node analyze_relational_expression(const std::shared_ptr<AST> & relational_exp);
+
+var_node analyze_shift_expression(const std::shared_ptr<AST> & shift_exp);
+
+var_node analyze_additive_expression(const std::shared_ptr<AST> & additive_exp);
+
+var_node analyze_multiplicative_expression(const std::shared_ptr<AST> & multiplicative_exp);
+
+var_node analyze_unary_expression(const std::shared_ptr<AST> &  unary_exp);
+
+var_node analyze_postfix_expression(const std::shared_ptr<AST> & postfix_exp);
+
+var_node analyze_primary_expression(const std::shared_ptr<AST> & primary_exp);
+
 bool lookup_var(std::string var_name);
+
+var_node loopup_node(std::string var_name);
+
+var_node create_temp_var(std::string var_name,std::string var_type);
 
 private:
     std::string error_msg;

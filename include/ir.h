@@ -13,7 +13,10 @@ private:
 
 public:
     unsigned int num_var=0;
-    void gen_parameter_ir(var_node node);
+    std::string gen_parameter_ir(var_node node);
+    void add_ir(std::string);
+
+
 };
 
 

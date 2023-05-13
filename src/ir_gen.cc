@@ -139,12 +139,177 @@ void ir_gen::analyze_parameter_declaration(std::shared_ptr<AST> root,const std::
     func_pool[func_name].para_list.emplace_back(new_var);
 
     if(definite)
-        ir.gen_parameter_ir(new_var);
+    {
+        ir.add_ir(ir.gen_parameter_ir(new_var));
+    }
 
 }
 
+var_node ir_gen::analyze_assignment_expression(std::shared_ptr<AST> assign_exp)
+{
+    if(assign_exp->left_child->name=="logical_or_expression")
+    {
+        std::shared_ptr<AST> logical_or_exp=assign_exp->left_child;
+        return this->analyze_logical_or_expression(logical_or_exp);
+    }
+}
 
-bool ir_gen::lookup_var(std::string var_name)
+var_node analyze_logical_or_expression(const std::shared_ptr<AST>& logical_or_exp)
+{
+    if(logical_or_exp->left_child->name=="logical_and_expression")
+    {
+        std::shared_ptr<AST> logical_and_exp=logical_or_exp->left_child;
+        return analyze_logical_and_expression(logical_and_exp);
+    }
+}
+
+var_node analyze_logical_and_expression(const std::shared_ptr<AST> &logical_and_exp)
+{
+    if(logical_and_exp->left_child->name=="inclusive_or_expression")
+    {
+        std::shared_ptr<AST> inclusive_or_exp=logical_and_exp->left_child;
+        return analyze_inclusive_or_expression(inclusive_or_exp);
+    }
+}
+
+var_node analyze_inclusive_or_expression(const std::shared_ptr<AST> &inclusive_or_exp)
+{
+    if(inclusive_or_exp->left_child->name=="exclusive_or_expression")
+    {
+        std::shared_ptr<AST> exclusive_or_exp=inclusive_or_exp->left_child;
+        return this->analyze_exclusive_or_expression(exclusive_or_exp);
+    }
+}
+
+var_node analyze_exclusive_or_expression(const std::shared_ptr<AST> &exclusive_or_exp)
+{
+    if(exclusive_or_exp->left_child->name=="and_expression")
+    {
+        std::shared_ptr<AST> and_exp=exclusive_or_exp->left_child;
+        return analyze_and_expression(and_exp);
+    }
+}
+
+var_node analyze_and_expression(const std::shared_ptr<AST> & and_exp)
+{
+    if(and_exp->left_child->name=="equality_expression")
+    {
+        std::shared_ptr<AST> equality_exp=and_exp->left_child;
+        return analyze_equality_expression(equality_exp);
+    }
+}
+
+var_node ir_gen::analyze_equality_expression(const std::shared_ptr<AST> &  equality_exp)
+{
+    if(equality_exp->left_child->name=="relational_expression")
+    {
+        std::shared_ptr<AST> relational_exp=equality_exp->left_child;
+        return analyze_relational_expression(relational_exp);
+    }
+}
+
+var_node ir_gen::analyze_relational_expression(const std::shared_ptr<AST> & relational_exp)
+{
+    if(relational_exp->left_child->name=="shift_expression")
+    {
+        std::shared_ptr<AST> shift_exp=relational_exp->left_child;
+        return analyze_shift_expression(shift_exp);
+    }
+}
+
+var_node ir_gen::analyze_shift_expression(const std::shared_ptr<AST> & shift_exp)
+{
+    if(shift_exp->left_child->name=="additive_expression")
+    {
+        std::shared_ptr<AST>  additive_exp=shift_exp->left_child;
+        return analyze_additive_expression(additive_exp);
+    }
+}
+
+var_node ir_gen::analyze_additive_expression(const std::shared_ptr<AST> & additive_exp)
+{
+    if(additive_exp->left_child->name=="multiplicative_expression")
+    {
+        std::shared_ptr<AST> multiplicative_exp=additive_exp->left_child;
+        return analyze_multiplicative_expression(multiplicative_exp);
+    }
+}
+
+var_node ir_gen::analyze_multiplicative_expression(const std::shared_ptr<AST> & multiplicative_exp)
+{
+    if(multiplicative_exp->left_child->name=="unary_expression")
+    {
+        std::shared_ptr<AST> unary_exp=multiplicative_exp->left_child;
+        return analyze_unary_expression(unary_exp);
+    }
+}
+
+var_node ir_gen:: analyze_unary_expression(const std::shared_ptr<AST> &  unary_exp)
+{
+    if(unary_exp->left_child->name=="postfix_expression")
+    {
+        std::shared_ptr<AST> postfix_exp=unary_exp->left_child;
+        return analyze_postfix_expression(postfix_exp);
+
+    }
+}
+
+var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix_exp)
+{
+    if(postfix_exp->left_child->name=="primary_expression")
+    {
+        std::shared_ptr<AST> primary_exp=postfix_exp->left_child;
+        return analyze_primary_expression(primary_exp);
+    }
+}
+
+var_node ir_gen::analyze_primary_expression(const std::shared_ptr<AST> & primary_exp)
+{
+    if(primary_exp->left_child->name=="IDENTIFIER")
+    {
+        //find it in the table built in var table in current block
+        std::string var_name=primary_exp->left_child->content;
+
+        var_node node=this->loopup_node(var_name);
+        if(node.id==-1)
+            error_msg="undefined variable "+var_name+".\n";
+        return node;
+    }
+
+    else if(primary_exp->left_child->name=="TRUE"||primary_exp->left_child->name=="FALSE")
+    {
+        std::string temp_var_name="temp"+std::to_string(ir.num_var++);
+        var_node new_var_node=create_temp_var(temp_var_name,"bool");
+        this->block_stack.back().var_map.insert(std::make_pair(temp_var_name,new_var_node));
+
+        if(primary_exp->left_child->name=="TRUE")
+            ir.add_ir(temp_var_name+" := #1");
+        else
+            
+
+    }
+}
+
+bool ir_gen::lookup_var(std::string var_name) // only find var in current block, used for checking multiple definition in the same block
 {
     return this->block_stack.back().var_map.find(var_name)!=this->block_stack.back().var_map.end();
+}
+
+var_node ir_gen:: loopup_node(std::string var_name) // finding a variable in all hierarchies
+{
+    for(auto& block:block_stack)
+    {
+        if(block.var_map.find(var_name)!=block.var_map.end())
+            return block.var_map[var_name];
+    }
+    // no result
+    var_node tmp;
+    tmp.id=-1;
+    return tmp;
+}
+
+var_node ir_gen::create_temp_var(std::string var_name,std::string var_type)
+{
+    var_node new_var_node(var_name,var_type);
+    return new_var_node;
 }
