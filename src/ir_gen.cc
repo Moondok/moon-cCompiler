@@ -285,10 +285,57 @@ var_node ir_gen::analyze_primary_expression(const std::shared_ptr<AST> & primary
         if(primary_exp->left_child->name=="TRUE")
             ir.add_ir(temp_var_name+" := #1");
         else
-            
+            ir.add_ir(temp_var_name+" := #0");
+        return new_var_node;
+
 
     }
+    else if (primary_exp->left_child->name=="CONSTANT_INT")
+    {
+        std::string content=primary_exp->left_child->content;
+        std::string temp_var_name="temp"+std::to_string(ir.num_var++);
+        var_node new_var_node=create_temp_var(temp_var_name,"int");
+        this->block_stack.back().var_map.insert(std::make_pair(temp_var_name,new_var_node));
+
+        ir.add_ir(temp_var_name+" := #"+ content); // we will distinguish int and float here later.
+        return new_var_node;
+    }
+
+    else if (primary_exp->left_child->name=="CONSTANT_DOUBLE")
+    {
+        std::string content=primary_exp->left_child->content;
+        std::string temp_var_name="temp"+std::to_string(ir.num_var++);
+        var_node new_var_node=create_temp_var(temp_var_name,"double");
+        this->block_stack.back().var_map.insert(std::make_pair(temp_var_name,new_var_node));
+
+        ir.add_ir(temp_var_name+" := #f"+ content); // we will distinguish int and float here later.
+        return new_var_node;
+    }
+
+    else if(primary_exp->left_child->name=="(")
+    {
+        std::shared_ptr<AST> exp=primary_exp->left_child->right_child;
+        return analyze_expression(exp);
+    }
 }
+
+var_node ir_gen::analyze_expression(const std::shared_ptr<AST> & exp)
+{
+    
+    
+    if (exp->left_child->name=="assignment_expression")
+        return analyze_assignment_expression(exp->left_child);
+    else if(exp->left_child->name=="expression")
+    {
+        var_node new_var_node=analyze_expression(exp->left_child);
+        // maybe a "," exists, so we do not return directly.
+        var_node tmp_var_node=analyze_assignment_expression(exp->right_child->right_child);
+        return new_var_node;
+        // tmp_var_node 's value is not used , but some intermediate results matter.
+    }
+    
+}
+
 
 bool ir_gen::lookup_var(std::string var_name) // only find var in current block, used for checking multiple definition in the same block
 {
