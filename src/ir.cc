@@ -31,3 +31,19 @@ std::string IR::get_array_name(array_node node)
 {
     return "array"+std::to_string(node.id);
 }
+
+std::string IR::gen_binary_operation_ir(std::string result,var_node a,var_node b,std::string op)
+{
+    std::string re=result+" := ";
+    if(a.id==-1)
+        re+=a.name;
+    else
+        re+="var"+std::to_string(a.id);
+    re=re+" "+op+" ";
+    if(b.id==-1)
+        re+=b.name;
+    else
+        re+="var"+std::to_string(b.id);
+
+    return re;
+}

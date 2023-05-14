@@ -152,51 +152,120 @@ var_node ir_gen::analyze_assignment_expression(std::shared_ptr<AST> assign_exp)
         std::shared_ptr<AST> logical_or_exp=assign_exp->left_child;
         return this->analyze_logical_or_expression(logical_or_exp);
     }
+    
+    
 }
 
-var_node analyze_logical_or_expression(const std::shared_ptr<AST>& logical_or_exp)
+var_node ir_gen::analyze_logical_or_expression(const std::shared_ptr<AST>& logical_or_exp)
 {
     if(logical_or_exp->left_child->name=="logical_and_expression")
     {
         std::shared_ptr<AST> logical_and_exp=logical_or_exp->left_child;
         return analyze_logical_and_expression(logical_and_exp);
     }
+    var_node operand1=analyze_logical_or_expression(logical_or_exp->left_child);
+    var_node operand2=analyze_logical_and_expression(logical_or_exp->left_child->right_child->right_child);
+
+    if(operand1.type!="bool"||operand2.type!="bool")
+        error_msg="logical or operation can only be performed between bool type.\n";
+    
+    std::string result_temp_name="temp"+std::to_string(ir.num_temp++);
+    var_node result_node=this->create_temp_var(result_temp_name,operand1.type);
+
+    block_stack.back().var_map.insert(std::make_pair(result_temp_name,result_node));
+    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name,operand1,operand2,"||")); //logical and operator &&
+    result_node.bool_str=ir.get_node_name(operand1)+" || "+ir.get_node_name(operand2);
+    
+    return result_node;
 }
 
-var_node analyze_logical_and_expression(const std::shared_ptr<AST> &logical_and_exp)
+var_node ir_gen::analyze_logical_and_expression(const std::shared_ptr<AST> &logical_and_exp)
 {
     if(logical_and_exp->left_child->name=="inclusive_or_expression")
     {
         std::shared_ptr<AST> inclusive_or_exp=logical_and_exp->left_child;
         return analyze_inclusive_or_expression(inclusive_or_exp);
     }
+    var_node operand1=analyze_logical_and_expression(logical_and_exp->left_child);
+    var_node operand2=analyze_exclusive_or_expression(logical_and_exp->left_child->right_child->right_child);
+
+    if(operand1.type!="bool"||operand2.type!="bool")
+        error_msg="logical and operation can only be performed between bool type.\n";
+    
+    std::string result_temp_name="temp"+std::to_string(ir.num_temp++);
+    var_node result_node=this->create_temp_var(result_temp_name,operand1.type);
+
+    block_stack.back().var_map.insert(std::make_pair(result_temp_name,result_node));
+    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name,operand1,operand2,"&&")); //logical and operator &&
+    result_node.bool_str=ir.get_node_name(operand1)+" && "+ir.get_node_name(operand2);
+    
+    return result_node;
 }
 
-var_node analyze_inclusive_or_expression(const std::shared_ptr<AST> &inclusive_or_exp)
+var_node ir_gen::analyze_inclusive_or_expression(const std::shared_ptr<AST> &inclusive_or_exp)
 {
     if(inclusive_or_exp->left_child->name=="exclusive_or_expression")
     {
         std::shared_ptr<AST> exclusive_or_exp=inclusive_or_exp->left_child;
         return this->analyze_exclusive_or_expression(exclusive_or_exp);
     }
+    var_node operand1=analyze_inclusive_or_expression(inclusive_or_exp->left_child);
+    var_node operand2=analyze_exclusive_or_expression(inclusive_or_exp->left_child->right_child->right_child);
+
+    if(operand1.type!="int"||operand2.type!="int")
+        error_msg="inclusive or operation can only be performed between int type.\n";
+    
+    std::string result_temp_name="temp"+std::to_string(ir.num_temp++);
+    var_node result_node=this->create_temp_var(result_temp_name,operand1.type);
+
+    block_stack.back().var_map.insert(std::make_pair(result_temp_name,result_node));
+    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name,operand1,operand2,inclusive_or_exp->left_child->right_child->name));
+
+    return result_node;
 }
 
-var_node analyze_exclusive_or_expression(const std::shared_ptr<AST> &exclusive_or_exp)
+var_node ir_gen::analyze_exclusive_or_expression(const std::shared_ptr<AST> &exclusive_or_exp)
 {
     if(exclusive_or_exp->left_child->name=="and_expression")
     {
         std::shared_ptr<AST> and_exp=exclusive_or_exp->left_child;
         return analyze_and_expression(and_exp);
     }
+    var_node operand1=analyze_exclusive_or_expression(exclusive_or_exp->left_child);
+    var_node operand2=analyze_and_expression(exclusive_or_exp->left_child->right_child->right_child);
+
+    if(operand1.type!="int"||operand2.type!="int")
+        error_msg="exclusive or operation can only be performed between int type.\n";
+    
+    std::string result_temp_name="temp"+std::to_string(ir.num_temp++);
+    var_node result_node=this->create_temp_var(result_temp_name,operand1.type);
+
+    block_stack.back().var_map.insert(std::make_pair(result_temp_name,result_node));
+    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name,operand1,operand2,exclusive_or_exp->left_child->right_child->name));
+
+    return result_node;
 }
 
-var_node analyze_and_expression(const std::shared_ptr<AST> & and_exp)
+var_node ir_gen::analyze_and_expression(const std::shared_ptr<AST> & and_exp)
 {
     if(and_exp->left_child->name=="equality_expression")
     {
         std::shared_ptr<AST> equality_exp=and_exp->left_child;
         return analyze_equality_expression(equality_exp);
     }
+    var_node operand1=analyze_and_expression(and_exp->left_child);
+    var_node operand2=analyze_equality_expression(and_exp->left_child->right_child->right_child);
+
+    if(operand1.type!="int"||operand2.type!="int")
+        error_msg="and operation can only be performed between int type.\n";
+    
+    std::string result_temp_name="temp"+std::to_string(ir.num_temp++);
+    var_node result_node=this->create_temp_var(result_temp_name,operand1.type);
+
+    block_stack.back().var_map.insert(std::make_pair(result_temp_name,result_node));
+    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name,operand1,operand2,and_exp->left_child->right_child->name));
+
+    return result_node;
 }
 
 var_node ir_gen::analyze_equality_expression(const std::shared_ptr<AST> &  equality_exp)
@@ -206,6 +275,26 @@ var_node ir_gen::analyze_equality_expression(const std::shared_ptr<AST> &  equal
         std::shared_ptr<AST> relational_exp=equality_exp->left_child;
         return analyze_relational_expression(relational_exp);
     }
+    std::string op=equality_exp->left_child->right_child->name;
+    op=(op=="EQ_OP")?"==":op;
+    op=(op=="NE_OP")?"!=":op;
+
+    var_node operand1=analyze_equality_expression(equality_exp->left_child);
+    var_node operand2=analyze_relational_expression(equality_exp->left_child->right_child->right_child);
+
+    if(operand1.type!=operand2.type)
+        error_msg="can not compare variables in different type.\n";
+    
+    std::string result_temp_name="temp"+std::to_string(ir.num_temp++);
+    var_node result_node=this->create_temp_var(result_temp_name,"bool");
+
+    block_stack.back().var_map.insert(std::make_pair(result_temp_name,result_node));
+    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name,operand1,operand2,op));
+
+    // 
+    result_node.bool_str=ir.get_node_name(operand1)+" "+op+" "+ir.get_node_name(operand2);// for selection statement
+
+    return result_node;
 }
 
 var_node ir_gen::analyze_relational_expression(const std::shared_ptr<AST> & relational_exp)
@@ -215,6 +304,27 @@ var_node ir_gen::analyze_relational_expression(const std::shared_ptr<AST> & rela
         std::shared_ptr<AST> shift_exp=relational_exp->left_child;
         return analyze_shift_expression(shift_exp);
     }
+    std::string op=relational_exp->left_child->right_child->name;
+    op=(op=="LE_OP")?"<=":op;
+    op=(op=="GE_OP")?">=":op;
+
+    var_node operand1=analyze_relational_expression(relational_exp->left_child);
+    var_node operand2=analyze_shift_expression(relational_exp->left_child->right_child->right_child);
+
+    if(operand1.type!=operand2.type)
+        error_msg="can not compare variables in different type.\n";
+    
+    std::string result_temp_name="temp"+std::to_string(ir.num_temp++);
+    var_node result_node=this->create_temp_var(result_temp_name,"bool");//  the result of comparison
+
+    block_stack.back().var_map.insert(std::make_pair(result_temp_name,result_node));
+    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name,operand1,operand2,op));
+
+    // 
+    result_node.bool_str=ir.get_node_name(operand1)+" "+op+" "+ir.get_node_name(operand2);// for selection statement
+
+    return result_node;
+
 }
 
 var_node ir_gen::analyze_shift_expression(const std::shared_ptr<AST> & shift_exp)
@@ -224,6 +334,25 @@ var_node ir_gen::analyze_shift_expression(const std::shared_ptr<AST> & shift_exp
         std::shared_ptr<AST>  additive_exp=shift_exp->left_child;
         return analyze_additive_expression(additive_exp);
     }
+    std::string op;
+    if(shift_exp->left_child->right_child->name=="LEFT_OP")
+        op=="<<";
+    else op==">>";
+    var_node operand1=analyze_shift_expression(shift_exp->left_child);
+    var_node operand2=analyze_additive_expression(shift_exp->left_child->right_child->right_child);
+
+    if(operand1.type!="int"||operand2.type!="int")
+        error_msg="can only exexute shift calcucation in int type.\n";
+    
+    std::string result_temp_name="temp"+std::to_string(ir.num_temp++);
+    var_node result_node=this->create_temp_var(result_temp_name,operand1.type);
+
+    block_stack.back().var_map.insert(std::make_pair(result_temp_name,result_node));
+    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name,operand1,operand2,op));
+
+    return result_node;
+
+
 }
 
 var_node ir_gen::analyze_additive_expression(const std::shared_ptr<AST> & additive_exp)
@@ -233,6 +362,20 @@ var_node ir_gen::analyze_additive_expression(const std::shared_ptr<AST> & additi
         std::shared_ptr<AST> multiplicative_exp=additive_exp->left_child;
         return analyze_multiplicative_expression(multiplicative_exp);
     }
+    var_node operand1=analyze_additive_expression(additive_exp->left_child);
+    var_node operand2=analyze_multiplicative_expression(additive_exp->left_child->right_child->right_child);
+
+    if(operand1.type!=operand2.type)
+        error_msg="can not exexute calcucation in between different operand.\n";
+    
+    std::string result_temp_name="temp"+std::to_string(ir.num_temp++);
+    var_node result_node=this->create_temp_var(result_temp_name,operand1.type);
+
+    block_stack.back().var_map.insert(std::make_pair(result_temp_name,result_node));
+    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name,operand1,operand2,additive_exp->left_child->right_child->name));
+
+    return result_node;
+
 }
 
 var_node ir_gen::analyze_multiplicative_expression(const std::shared_ptr<AST> & multiplicative_exp)
@@ -242,6 +385,19 @@ var_node ir_gen::analyze_multiplicative_expression(const std::shared_ptr<AST> & 
         std::shared_ptr<AST> unary_exp=multiplicative_exp->left_child;
         return analyze_unary_expression(unary_exp);
     }
+    var_node operand1=analyze_multiplicative_expression(multiplicative_exp->left_child);
+    var_node operand2=analyze_unary_expression(multiplicative_exp->left_child->right_child->right_child);
+
+    if(operand1.type!=operand2.type)
+        error_msg="can not exexute calcucation in between different operand.\n";
+    
+    std::string result_temp_name="temp"+std::to_string(ir.num_temp++);
+    var_node result_node=this->create_temp_var(result_temp_name,operand1.type);
+
+    block_stack.back().var_map.insert(std::make_pair(result_temp_name,result_node));
+    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name,operand1,operand2,multiplicative_exp->left_child->right_child->name));
+
+    return result_node;
 }
 
 //++a; 
@@ -330,7 +486,7 @@ var_node ir_gen:: analyze_unary_expression(const std::shared_ptr<AST> &  unary_e
             var_node new_node=create_temp_var(return_temp_name,rnode.type);
             block_stack.back().var_map.insert(std::make_pair(return_temp_name,new_node));
             // by performing 1111 ^ a ,inverse a's every bit.
-            ir.add_ir(return_temp_name+" :="+temp_name+" ^ "+ir.get_node_name(rnode));
+            ir.add_ir(return_temp_name+" :="+temp_name+" ^ "+ir.get_node_name(rnode));//same for exclusive or
             return new_node;
         }
     
