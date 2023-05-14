@@ -244,16 +244,102 @@ var_node ir_gen::analyze_multiplicative_expression(const std::shared_ptr<AST> & 
     }
 }
 
+//++a; 
 var_node ir_gen:: analyze_unary_expression(const std::shared_ptr<AST> &  unary_exp)
 {
     if(unary_exp->left_child->name=="postfix_expression")
     {
         std::shared_ptr<AST> postfix_exp=unary_exp->left_child;
         return analyze_postfix_expression(postfix_exp);
+    }
+    else if(unary_exp->left_child->name=="INC_OP")
+    {
+        var_node rnode=analyze_unary_expression(unary_exp->left_child->right_child);
+        if(rnode.type!="int")
+            error_msg="\'++\' operation only suits for int .\n";
+
+        std::string temp_name="temp"+std::to_string(ir.num_temp++);
+        var_node constant_node=this->create_temp_var(temp_name,"int");
+        block_stack.back().var_map.insert(std::make_pair(temp_name,constant_node));
+        ir.add_ir(temp_name+" := #1");
+
+        //for ++a 's return value is a+1, there is no need to create a brand new variable
+        ir.add_ir(ir.get_node_name(rnode)+" := "+ir.get_node_name(rnode)+" + "+temp_name);
+
+        return rnode;
+    }
+    else if (unary_exp->left_child->name=="DEC_OP")
+    {
+        var_node rnode=analyze_unary_expression(unary_exp->left_child->right_child);
+        if(rnode.type!="int")
+            error_msg="\'--\' operation only suits for int .\n";
+
+        std::string temp_name="temp"+std::to_string(ir.num_temp++);
+        var_node constant_node=this->create_temp_var(temp_name,"int");
+        block_stack.back().var_map.insert(std::make_pair(temp_name,constant_node));
+        ir.add_ir(temp_name+" := #1");
+
+        //for ++a 's return value is a+1, there is no need to create a brand new variable
+        ir.add_ir(ir.get_node_name(rnode)+" := "+ir.get_node_name(rnode)+" - "+temp_name);
 
     }
+    else if(unary_exp->left_child->name=="unary_operator")
+    {
+        std::string op=unary_exp->left_child->left_child->name;
+        var_node rnode=analyze_unary_expression(unary_exp->left_child->right_child) ;// change to cast_expression later
+
+        if(op=="+")
+        {
+            if(rnode.type!="int"&&rnode.type!="double"&&rnode.type!="float")
+                error_msg="operator \'+\' can only be used in numerical tyoe.\n";
+            return rnode;
+        }
+        else if(op=="-")
+        {
+            if(rnode.type!="int"&&rnode.type!="double"&&rnode.type!="float")
+                error_msg="operator \'+\' can only be used in numerical tyoe.\n";
+            
+            std::string temp_name="temp"+std::to_string(ir.num_temp++);
+
+            // create a zero node for 0-a=-a
+            var_node zero_node=this->create_temp_var(temp_name,rnode.type);
+            block_stack.back().var_map.insert(std::make_pair(temp_name,zero_node));
+
+            ir.add_ir(temp_name+" := #0");
+
+            std::string return_temp_name="temp"+std::to_string(ir.num_temp++);
+            var_node new_node=create_temp_var(return_temp_name,rnode.type);
+            block_stack.back().var_map.insert(std::make_pair(return_temp_name,new_node));
+            ir.add_ir(return_temp_name+" :="+temp_name+" - "+ir.get_node_name(rnode));
+            return new_node;
+        }
+        else if(op=="~") // only suitable for int ,implemented by xor 
+        {
+            if(rnode.type!="int")
+                error_msg="operator \'~\' can only be used in numerical tyoe.\n";
+            
+            std::string temp_name="temp"+std::to_string(ir.num_temp++);
+
+            // create a zero node for 0-a=-a
+            var_node zero_node=this->create_temp_var(temp_name,rnode.type);
+            block_stack.back().var_map.insert(std::make_pair(temp_name,zero_node));
+
+            ir.add_ir(temp_name+" := #-2147483648"); //11111111(32 bits)
+
+            std::string return_temp_name="temp"+std::to_string(ir.num_temp++);
+            var_node new_node=create_temp_var(return_temp_name,rnode.type);
+            block_stack.back().var_map.insert(std::make_pair(return_temp_name,new_node));
+            // by performing 1111 ^ a ,inverse a's every bit.
+            ir.add_ir(return_temp_name+" :="+temp_name+" ^ "+ir.get_node_name(rnode));
+            return new_node;
+        }
+    
+    }
+    // *, & and ! is on the way.
+
 }
 
+//a++ a--, a(), a[] ,a
 var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix_exp)
 {
     if(postfix_exp->left_child->name=="primary_expression")
@@ -334,10 +420,47 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
         }
         else if(postfix_exp->left_child->right_child->name=="INC_OP")
         {
+            var_node current_node=analyze_postfix_expression(postfix_exp->left_child);
+            if(current_node.type!="int")
+                error_msg="\'++\' operation only suits for int .\n";
             
-        }
-        
+            std::string temp_name="temp"+std::to_string(ir.num_temp++);
+            var_node return_node=this->create_temp_var(temp_name,"int");
+            block_stack.back().var_map.insert(std::make_pair(temp_name,return_node));
 
+            std::string temp_constant_name="temp"+std::to_string(ir.num_temp++);
+            var_node constant_var_node=this->create_temp_var(temp_constant_name,"int");
+            block_stack.back().var_map.insert(std::make_pair(temp_constant_name,constant_var_node));
+
+            ir.add_ir(temp_constant_name+" := #1");
+
+            ir.add_ir(temp_name=" :="+ir.get_node_name(current_node)); // the return value remains the value of vurrent var
+            ir.add_ir(ir.get_node_name(current_node)+" := "+ir.get_node_name(current_node)+" + "+temp_constant_name);
+
+            return return_node;
+        }
+
+        else if(postfix_exp->left_child->right_child->name=="DEC_OP")
+        {
+            var_node current_node=analyze_postfix_expression(postfix_exp->left_child);
+            if(current_node.type!="int")
+                error_msg="\'--\' operation only suits for int .\n";
+
+            std::string temp_name="temp"+std::to_string(ir.num_temp++);
+            var_node return_node=this->create_temp_var(temp_name,"int");
+            block_stack.back().var_map.insert(std::make_pair(temp_name,return_node));
+
+            std::string temp_constant_name="temp"+std::to_string(ir.num_temp++);
+            var_node constant_var_node=this->create_temp_var(temp_constant_name,"int");
+            block_stack.back().var_map.insert(std::make_pair(temp_constant_name,constant_var_node));
+
+            ir.add_ir(temp_constant_name+" := #1");
+
+            ir.add_ir(temp_name=" :="+ir.get_node_name(current_node)); // the return value remains the value of vurrent var
+            ir.add_ir(ir.get_node_name(current_node)+" := "+ir.get_node_name(current_node)+" - "+temp_constant_name);
+
+            return return_node;
+        }
     }
 }
 
