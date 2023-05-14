@@ -152,7 +152,58 @@ var_node ir_gen::analyze_assignment_expression(std::shared_ptr<AST> assign_exp)
         std::shared_ptr<AST> logical_or_exp=assign_exp->left_child;
         return this->analyze_logical_or_expression(logical_or_exp);
     }
+    var_node left_node=analyze_unary_expression(assign_exp->left_child);
+    var_node right_node=analyze_assignment_expression(assign_exp->right_child->right_child);
+    var_node tmp_node;
+    std::string op=assign_exp->left_child->right_child->left_child->name;
+    if(op=="=")
+        tmp_node=right_node;
+    else
+    {
+        std::string temp_name="temp"+std::to_string(ir.num_temp++);
+        tmp_node=create_temp_var(temp_name,left_node.type);
+        block_stack.back().var_map.insert(std::make_pair(temp_name,tmp_node));
+
+        if(left_node.type!=right_node.type)
+            error_msg="two operands must have the same type.\n";
+
+        if(op=="MUL_ASSIGN")
+            ir.add_ir(ir.gen_binary_operation_ir(temp_name,left_node,right_node,"*"));
+        else if(op=="DIV_ASSIGN")
+            ir.add_ir(ir.gen_binary_operation_ir(temp_name,left_node,right_node,"/"));
+        else if(op=="MOD_ASSIGN")
+        {
+            if(left_node.type!="int")
+                error_msg="two operands for '%' operation must be int.\n";
+            ir.add_ir(ir.gen_binary_operation_ir(temp_name,left_node,right_node,"%"));
+        }
+        else if(op=="ADD_ASSIGN")
+            ir.add_ir(ir.gen_binary_operation_ir(temp_name,left_node,right_node,"+"));
+        else if(op=="SUB_ASSIGN")
+            ir.add_ir(ir.gen_binary_operation_ir(temp_name,left_node,right_node,"-"));
+        else
+        {
+            if(left_node.type!="int")
+                error_msg="two operands for this operation must be int.\n";
+            if(op=="LEFT_ASSIGN")
+                ir.add_ir(ir.gen_binary_operation_ir(temp_name,left_node,right_node,"<<"));
+            else if(op=="RIGHT_ASSIGN")
+                ir.add_ir(ir.gen_binary_operation_ir(temp_name,left_node,right_node,">>"));
+            else if(op=="AND_ASSIGN")
+                ir.add_ir(ir.gen_binary_operation_ir(temp_name,left_node,right_node,"&"));
+            else if(op=="OR_ASSIGN")
+                ir.add_ir(ir.gen_binary_operation_ir(temp_name,left_node,right_node,"|"));
+            else if(op=="XOR_ASSIGN")
+                ir.add_ir(ir.gen_binary_operation_ir(temp_name,left_node,right_node,"^"));
+        }
+    }
+    std::string new_code="var"+std::to_string(left_node.id)+" := ";
+    if(tmp_node.id==-1)
+        new_code+=tmp_node.name;
+    else
+        new_code+="var"+std::to_string(tmp_node.id);
     
+    return left_node;
     
 }
 
