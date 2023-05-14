@@ -9,3 +9,25 @@ std::string IR::gen_parameter_ir(var_node node)
     std::string re="param var"+std::to_string(node.id);
     return re;
 }
+
+std::string IR::gen_argument_ir(var_node node)
+{
+    // here pointer are not considered for now
+    if(node.id<0)// temp
+        return "arg "+node.name;
+    else // user defined variables
+        return "arg var"+std::to_string(node.id);
+}
+
+std::string IR::get_node_name(var_node node) 
+{
+    if(node.id<0)// temp variable
+        return node.name;
+    else // a user defined variable
+        return ("var"+std::to_string(node.id));
+}
+
+std::string IR::get_array_name(array_node node)
+{
+    return "array"+std::to_string(node.id);
+}

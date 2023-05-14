@@ -261,6 +261,84 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
         std::shared_ptr<AST> primary_exp=postfix_exp->left_child;
         return analyze_primary_expression(primary_exp);
     }
+    else if (postfix_exp->left_child->right_child->name=="[")
+    {
+        std::string array_name=postfix_exp->left_child->left_child->left_child->content;
+        std::shared_ptr<AST> exp=postfix_exp->left_child->right_child->right_child;
+        var_node length_node=analyze_expression(exp);
+        array_node new_array_node=loopup_array(array_name);
+        if(new_array_node.num==-1)
+            error_msg="undefined array "+array_name;
+
+        std::string temp_name="temp"+std::to_string(ir.num_var);
+        var_node new_temp_var(temp_name,new_array_node.type,ir.num_temp++,true);
+        this->block_stack.back().var_map.insert(std::make_pair(temp_name,new_temp_var));
+
+        if(new_array_node.type=="int"||new_array_node.type=="float"||new_array_node.type=="double")
+        {
+            
+            std::string temp_index_name="temp"+std::to_string(ir.num_temp++);
+            var_node temp_var2(temp_index_name,"int");// this is the index of the array
+            this->block_stack.back().var_map.insert(std::make_pair(temp_index_name,temp_var2));
+
+            if(new_array_node.type=="int"||new_array_node.type=="float")
+            {
+                std::string temp_constant_name="temp"+std::to_string(ir.num_temp++);// stores 4
+                var_node temp_var3(temp_constant_name,"int");
+                block_stack.back().var_map.insert(std::make_pair(temp_constant_name,temp_var3));
+
+                ir.add_ir(temp_constant_name+" :=#4");
+                ir.add_ir(temp_index_name+ " :="+ir.get_node_name(length_node)+" * "+temp_index_name);
+            }
+
+            else if(new_array_node.type=="double")
+            {
+                std::string temp_constant_name="temp"+std::to_string(ir.num_temp++);
+                var_node temp_var3(temp_constant_name,"int");
+                this->block_stack.back().var_map.insert(std::make_pair(temp_constant_name,temp_var3));
+
+                ir.add_ir(temp_constant_name+" :=#8"); //type double
+                ir.add_ir(temp_index_name+ " :="+ir.get_node_name(length_node)+" * "+temp_index_name);
+            }
+            //assign the value from an array
+
+            ir.add_ir(temp_name+" :=&"+ir.get_array_name(new_array_node)+" + "+ir.get_node_name(length_node));
+            return new_temp_var;
+        }
+        
+        else if (postfix_exp->left_child->right_child->name=="(")
+        {
+            std::string func_name=postfix_exp->left_child->left_child->left_child->content;
+            func_node func=func_pool[func_name];
+            
+            var_node new_var_node; // restore the return value of a function call.
+            if(func_pool.find(func_name)==func_pool.end())
+                error_msg="undefined function "+func_name;
+            if(postfix_exp->left_child->right_child->right_child->name=="argument_expression_list")
+            {
+                std::shared_ptr<AST> argument_expression_list=postfix_exp->left_child->right_child->right_child;
+                analyze_argument_expression_list(argument_expression_list,func_name);
+            }
+
+            if(func.rtype=="void")
+                ir.add_ir("call "+func_name);
+            else
+            {
+                std::string temp_name="temp"+std::to_string(ir.num_temp++);
+                new_var_node=this->create_temp_var(temp_name,func.rtype);
+                ir.add_ir(temp_name+"call "+func_name);
+            }
+
+            return new_var_node;
+
+        }
+        else if(postfix_exp->left_child->right_child->name=="INC_OP")
+        {
+            
+        }
+        
+
+    }
 }
 
 var_node ir_gen::analyze_primary_expression(const std::shared_ptr<AST> & primary_exp)
@@ -336,6 +414,48 @@ var_node ir_gen::analyze_expression(const std::shared_ptr<AST> & exp)
     
 }
 
+void ir_gen::analyze_argument_expression_list(const std::shared_ptr<AST> & node, std::string func_name)
+{
+    std::shared_ptr<AST> start=node->left_child;
+    func_node func=this->func_pool[func_name];
+    unsigned int cnt=0;
+    //cuz we may have multiple arguments, so here we adopt a loop 
+    while(start->name=="argument_expression_list")
+    {
+        // note that by this way , the argument in our IR are in the inverse order!
+        var_node new_arg_node=analyze_assignment_expression(start->right_child->right_child);
+        ir.add_ir(ir.gen_argument_ir(new_arg_node));
+
+        start=start->left_child;
+        cnt++;
+        if(cnt>=func.para_list.size())
+            error_msg="too many atguments passed to our function.\n";
+        if(func.para_list[func.para_list.size()-cnt].type!=new_arg_node.type)
+            error_msg="the type of argument you passed is not match the type you defined.\n";
+    }
+
+    var_node last_arg_node=analyze_assignment_expression(start);
+    ir.add_ir(ir.gen_argument_ir(last_arg_node));
+    cnt++;
+    if(func.para_list[func.para_list.size()-cnt].type!=last_arg_node.type)
+        error_msg="the type of argument you passed is not match the type you defined.\n";
+
+    if(cnt!=func.para_list.size())
+        error_msg="too less arguments passed in.\n";
+        
+}
+
+array_node ir_gen::loopup_array(std::string name)
+{
+    for(auto &block:this->block_stack)
+    {
+        if(block.arr_map.find(name)!=block.arr_map.end())
+            return block.arr_map[name];
+    }
+    array_node tmp;
+    tmp.num=-1;
+    return tmp;
+}
 
 bool ir_gen::lookup_var(std::string var_name) // only find var in current block, used for checking multiple definition in the same block
 {

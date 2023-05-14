@@ -56,11 +56,17 @@ var_node analyze_postfix_expression(const std::shared_ptr<AST> & postfix_exp);
 
 var_node analyze_primary_expression(const std::shared_ptr<AST> & primary_exp);
 
+var_node analyze_expression(const std::shared_ptr<AST> & exp);
+
+void analyze_argument_expression_list(const std::shared_ptr<AST> & node, std::string func_name);
+
 bool lookup_var(std::string var_name);
 
 var_node loopup_node(std::string var_name);
 
 var_node create_temp_var(std::string var_name,std::string var_type);
+
+array_node loopup_array(std::string name);
 
 private:
     std::string error_msg;

@@ -8,10 +8,11 @@
 class var_node
 {
 public:
+    bool is_addr; // a pointer
     std::string name;
     std::string type;
     unsigned int id;
-    var_node(std::string n,std::string t,unsigned int i=-1):name(n),type(t),id(i){};
+    var_node(std::string n,std::string t,unsigned int i=-1,bool is_arr=false):name(n),type(t),id(i),is_addr(is_arr){};
     var_node():name(""),type(""),id(-1){};
 };
 
@@ -30,7 +31,8 @@ class array_node
 public:
     std::string name;
     std::string type;
-    unsigned int num;
+    unsigned int id;
+    unsigned int num; //capacity
 };
 
 class Block
