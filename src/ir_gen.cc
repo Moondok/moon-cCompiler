@@ -23,7 +23,81 @@ void ir_gen::analyze_tree(const std::shared_ptr<AST> &root)
 
 void ir_gen::analyze_iteration_statement(const std::shared_ptr<AST> & root)
 {
+    if(root->left_child->name=="WHILE")
+    {
+        Block new_block;
+        new_block.can_break=true;
+        block_stack.emplace_back(new_block);
 
+        std::shared_ptr<AST> expression=root->left_child->right_child->right_child;
+        std::shared_ptr<AST> statement=expression->right_child->right_child;
+
+        std::string label1=ir.gen_label_name();
+        std::string label2=ir.gen_label_name();
+        std::string label3=ir.gen_label_name();
+
+        block_stack.back().break_label=label3;
+
+        ir.add_ir("LABEL "+label1+" :");
+
+        var_node condition_var=analyze_expression(expression);
+
+        if(condition_var.type=="bool")
+            ir.add_ir("IF "+condition_var.bool_str+" GOTO "+label2);
+        else 
+        {
+            std::string temp_zero_name="temp"+std::to_string(ir.num_temp++);
+            var_node temp_node=this->create_temp_var(temp_zero_name,"int");
+            ir.add_ir(temp_zero_name+" := #0");
+            ir.add_ir("IF "+ir.get_node_name(condition_var)+" != "+temp_zero_name+ " GOTO "+label2);
+
+        }
+
+        ir.add_ir("GOTO "+label3); //terminate
+        ir.add_ir("LABEL "+label2+ " :");//sequently execute
+        analyze_statement(statement);
+
+        ir.add_ir("GOTO "+label1);// go to judge
+        ir.add_ir("LABEL "+label3+" :"); // end 
+
+        block_stack.pop_back();
+
+    }
+
+    else if(root->left_child->name=="DO")
+    {
+        Block new_block;
+        new_block.can_break=true;
+        block_stack.emplace_back(new_block);
+
+        std::shared_ptr<AST> statement=root->left_child->right_child;
+        std::shared_ptr<AST> exp=statement->right_child->right_child->right_child;
+
+        std::string label1=ir.gen_label_name();
+        std::string label2=ir.gen_label_name();
+
+        block_stack.back().break_label=label2;
+
+        //label1 is the beginning , consistency for continue
+        ir.add_ir("LABEL "+label1+" :");
+
+        analyze_statement(statement);
+
+        var_node condition_var=analyze_expression(exp);
+
+        if(condition_var.type=="bool")
+            ir.add_ir("IF "+condition_var.bool_str+" GOTO "+label1);
+        else 
+        {
+            std::string temp_zero_name="temp"+std::to_string(ir.num_temp++);
+            var_node temp_node=this->create_temp_var(temp_zero_name,"int");
+            ir.add_ir(temp_zero_name+" := #0");
+            ir.add_ir("IF "+ir.get_node_name(condition_var)+" != "+temp_zero_name+" GOTO "+label1);
+
+        }
+        ir.add_ir("LABEL "+label2+ " :");
+        block_stack.pop_back();
+    }
 }
 
 void ir_gen::analyze_compound_statement(const std::shared_ptr<AST> &root)

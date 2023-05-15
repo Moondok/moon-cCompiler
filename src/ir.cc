@@ -47,3 +47,8 @@ std::string IR::gen_binary_operation_ir(std::string result,var_node a,var_node b
 
     return re;
 }
+
+std::string IR::gen_label_name()
+{
+    return "label"+std::to_string(num_label++);
+}
