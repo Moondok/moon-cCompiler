@@ -34,6 +34,8 @@ public:
     std::string type;
     unsigned int id;
     unsigned int num; //capacity
+    array_node(){};
+    array_node(std::string n,std::string t,unsigned int i=-1,unsigned int nu=-1):name(n),type(t),id(i),num(nu){};
 };
 
 class Block

@@ -27,7 +27,7 @@ std::string IR::get_node_name(var_node node)
         return ("var"+std::to_string(node.id));
 }
 
-std::string IR::get_array_name(array_node node)
+std::string IR::gen_array_name(array_node node)
 {
     return "array"+std::to_string(node.id);
 }

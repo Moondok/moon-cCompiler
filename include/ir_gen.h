@@ -24,9 +24,13 @@ ir_gen(){};
 
 return_msg analyze_tree(std::shared_ptr<AST> root);
 
-void analyze_init_declarator(std::shared_ptr<AST> root, std::string var_type) ;
+void analyze_init_declarator_list(std::shared_ptr<AST> root, std::string var_type) ;
 
-void analyze_parameter_declaration(std::shared_ptr<AST> root,const std::string &func_name, bool definite);
+void analyze_init_declarator(const std::shared_ptr<AST> &root,std::string var_type);
+
+void analyze_parameter_list(const std::shared_ptr<AST>& root,std::string func_name,bool is_definite);
+
+void analyze_parameter_declaration(const std::shared_ptr<AST>& root,const std::string &func_name, bool definite);
 
 var_node analyze_assignment_expression(std::shared_ptr<AST> assign_exp);
 
@@ -60,7 +64,7 @@ var_node analyze_expression(const std::shared_ptr<AST> & exp);
 
 void analyze_argument_expression_list(const std::shared_ptr<AST> & node, std::string func_name);
 
-bool lookup_var(std::string var_name);
+bool lookup_current_var(std::string var_name);
 
 var_node loopup_node(std::string var_name);
 

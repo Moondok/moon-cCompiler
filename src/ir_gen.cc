@@ -38,18 +38,18 @@ ir_gen:: analyze_declaration(std::shared_ptr<AST> root)
    
 }
 
-ir_gen::analyze_init_declarator_list(std::shared_ptr<AST> root, std::string type)
+void ir_gen::analyze_init_declarator_list(std::shared_ptr<AST> root, std::string type)
 {
     if(root->left_child->name=="init_declarator_list")
-        analyze_init_declarator_list(root->left,type);
-    else if(node->left_child->name=="init_declarator")
-        analyze_init_declarator(root->left,type);
+        analyze_init_declarator_list(root->left_child,type);
+    else if(root->left_child->name=="init_declarator")
+        analyze_init_declarator(root->left_child,type);
     
     if(root->right_child->name==",")
         analyze_init_declarator(root->right_child->right_child,type);
 }
 
-void ir_gen::analyze_init_declarator(std::shared_ptr<AST> root, std::string var_type)
+void ir_gen::analyze_init_declarator(const std::shared_ptr<AST> & root, std::string var_type) //analyze_declararor is hidden in this function implicitly
 {
     std::shared_ptr<AST> declarator=root->left_child;
 
@@ -58,7 +58,7 @@ void ir_gen::analyze_init_declarator(std::shared_ptr<AST> root, std::string var_
         if(declarator->left_child->name=="IDENTIFIER")
         {
             std::string var_name=declarator->left_child->content;
-            if(!lookup_var(var_name))
+            if(!lookup_current_var(var_name))
             {
                 var_node new_var;
                 new_var.name=var_name;
@@ -75,7 +75,7 @@ void ir_gen::analyze_init_declarator(std::shared_ptr<AST> root, std::string var_
         else
         {
             //function definition
-            if(declarator->left_child->right_child->name=="(")
+            if(declarator->left_child->right_child->name=="(") // this is function definition
             {
                 std::string func_name=declarator->left_child->left_child->content;
                 std::string func_rtype=var_type;
@@ -89,7 +89,8 @@ void ir_gen::analyze_init_declarator(std::shared_ptr<AST> root, std::string var_
                 new_func.rtype=func_rtype;
                 this->func_pool.insert(std::make_pair(func_name,new_func));
 
-                analyze_parameter_list(declarator->left_child->right_child->right_child,func_name,false);
+                if(declarator->left_child->right_child->right_child->name!=")") // func with parameters
+                    analyze_parameter_list(declarator->left_child->right_child->right_child,func_name,false);
 
             }
 
@@ -99,19 +100,59 @@ void ir_gen::analyze_init_declarator(std::shared_ptr<AST> root, std::string var_
                 std::string arr_type=var_type;
                 std::shared_ptr<AST> assign_exp=declarator->left_child->right_child->right_child;
                 var_node rnode=analyze_assignment_expression(assign_exp);
+
+
+                // this is an array's definition, we need an constant expression , to be done!
+                if(rnode.type!="int")
+                    error_msg="the size of an array must be an constant int.\n";
+
+                // for the array's size is an constant ,i do not plan to add perform a calculate ir here.
+                array_node new_array_node(arr_name,arr_type,ir.num_arr++); // to be done: add the representation of capacity.
+                ir.add_ir("ARRAY "+ir.gen_array_name(new_array_node)+" "+rnode.name);//to be done: here rnode.name is just a placeholder, we need a string representing capacity here!!!
             }
+        }
+    }
+
+    else if(declarator->right_child->name=="=")
+    {
+        var_node new_var_node;
+        if(declarator->left_child->name=="IDENTIFIER")
+        {
+            std::string new_var_name=declarator->left_child->content;
+            if(!lookup_current_var(new_var_name))
+            {
+                new_var_node.name=new_var_name;
+                new_var_node.type=var_type;
+                new_var_node.id=ir.num_var++;
+                this->block_stack.back().var_map.insert(std::make_pair(new_var_name,new_var_node));
+            }
+            else
+                error_msg="multiple definitions for variable "+new_var_name+".\n";
+        }
+        std::shared_ptr<AST> initializer=declarator->right_child->right_child;
+        if(initializer->left_child->name=="assignment_expression")
+        {
+            var_node rnode=this->analyze_assignment_expression(initializer->left_child);
+
+            if(rnode.type!=var_type)
+                error_msg="must use same type to perform initialization.\n";
+            std::string re="var"+std::to_string(new_var_node.id)+=" := ";
+            if(rnode.id==-1)
+                re+=rnode.name;
+            else
+                re+="var"+std::to_string(rnode.id);
+            ir.add_ir(re);
         }
     }
 }
 
-void ir_gen::analyze_parameter_list(std::shared_ptr<AST> root,std::string func_name, bool definite)
+void ir_gen::analyze_parameter_list(const std::shared_ptr<AST>& root,std::string func_name, bool definite)
 {
     if(root->left_child->name=="parameter_list")
         analyze_parameter_list(root->left_child,func_name,definite);
     else
-        analyze_parameter_declaration(root->left,func_name,definite);
+        analyze_parameter_declaration(root->left_child,func_name,definite);
     
-
     if(root->left_child->right_child->name==",")
     {
         analyze_parameter_declaration(root->left_child->right_child->right_child,func_name,definite);
@@ -119,13 +160,13 @@ void ir_gen::analyze_parameter_list(std::shared_ptr<AST> root,std::string func_n
     }
 }
 
-void ir_gen::analyze_parameter_declaration(std::shared_ptr<AST> root,const std::string &func_name, bool definite)
+void ir_gen::analyze_parameter_declaration(const std::shared_ptr<AST>& root,const std::string &func_name, bool definite)
 {
     if(root->left_child->left_child->name=="VOID")
         this->error_msg="can not define a variable with \'void\' type\n";
 
-    std::shared_ptr<AST> declarator=root->left_child->right_child;
-    std::string var_name=declarator->left_child->content;
+    std::shared_ptr<AST> declarator=root->left_child->right_child; // we do not take abstract declarator for now
+    std::string var_name=declarator->left_child->content; // the parameter is a single parameter instead of complex ones
     var_node new_var;
     new_var.name=var_name;
     new_var.type=root->left_child->left_child->content;
@@ -595,7 +636,7 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
             }
             //assign the value from an array
 
-            ir.add_ir(temp_name+" :=&"+ir.get_array_name(new_array_node)+" + "+ir.get_node_name(length_node));
+            ir.add_ir(temp_name+" :=&"+ir.gen_array_name(new_array_node)+" + "+ir.get_node_name(length_node));
             return new_temp_var;
         }
         
@@ -787,7 +828,7 @@ array_node ir_gen::loopup_array(std::string name)
     return tmp;
 }
 
-bool ir_gen::lookup_var(std::string var_name) // only find var in current block, used for checking multiple definition in the same block
+bool ir_gen::lookup_current_var(std::string var_name) // only find var in current block, used for checking multiple definition in the same block
 {
     return this->block_stack.back().var_map.find(var_name)!=this->block_stack.back().var_map.end();
 }
