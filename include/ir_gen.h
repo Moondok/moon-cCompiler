@@ -24,6 +24,12 @@ ir_gen(){};
 
 void analyze_tree(const std::shared_ptr<AST> & root);
 
+void analyze_selection_statement(const std::shared_ptr<AST> & root);
+
+void analyze_jump_statement(const std::shared_ptr<AST> & root);
+
+void analyze_expression_statement(const std::shared_ptr<AST> & root);
+
 void analyze_statement(const std::shared_ptr<AST> & root);
 
 void analyze_iteration_statement(const std::shared_ptr<AST> & root);

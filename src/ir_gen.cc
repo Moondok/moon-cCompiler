@@ -98,6 +98,115 @@ void ir_gen::analyze_iteration_statement(const std::shared_ptr<AST> & root)
         ir.add_ir("LABEL "+label2+ " :");
         block_stack.pop_back();
     }
+
+    else if(root->left_child->name=="FOR")
+    {
+
+    }
+}
+
+void ir_gen::analyze_statement(const std::shared_ptr<AST> & root)
+{
+    if(root->left_child->name=="compound_statement")
+        analyze_compound_statement(root->left_child);
+    else if(root->left_child->name=="expression_statement")
+        analyze_expression_statement(root->left_child);
+    else if(root->left_child->name=="selection_statement")
+        analyze_selection_statement(root->left_child);
+    else if(root->left_child->name=="iteration_statement")
+        analyze_iteration_statement(root->left_child);
+    else if(root->left_child->name=="jump_statement")
+        analyze_jump_statement(root->left_child);
+    
+}
+
+void ir_gen::analyze_expression_statement(const std::shared_ptr<AST> &root)
+{
+    if(root->left_child->name=="expression")
+        analyze_expression(root->left_child);
+}
+
+void ir_gen::analyze_jump_statement(const std::shared_ptr<AST> & root)
+{
+    
+}
+
+void ir_gen::analyze_selection_statement(const std::shared_ptr<AST> & root)
+{
+    // no else
+    if(root->left_child->right_child->right_child->right_child->right_child->right_child==nullptr)
+    {
+        Block new_block;
+        block_stack.emplace_back(new_block);
+
+        std::shared_ptr<AST> exp=root->left_child->right_child->right_child;
+        var_node condition_var=analyze_expression(exp);
+
+        std::shared_ptr<AST> statement=root->left_child->right_child->right_child->right_child->right_child;
+
+        std::string label1=ir.gen_label_name();
+        std::string label2=ir.gen_label_name();
+
+        if(condition_var.type=="bool")
+            ir.add_ir("IF "+condition_var.bool_str+" GOTO "+label1);
+        else
+        {
+            std::string temp_zero_name="temp"+std::to_string(ir.num_temp++);
+            var_node temp_node=this->create_temp_var(temp_zero_name,"int");
+            ir.add_ir(temp_zero_name+" := #0");
+            ir.add_ir("IF "+ir.get_node_name(condition_var)+" != "+temp_zero_name+" GOTO "+label1);
+        }
+        ir.add_ir("GOTO "+label2);
+        ir.add_ir("LABEL "+label1+ " :");
+
+        analyze_statement(statement);
+        ir.add_ir("LABEL "+label2+" :");
+        block_stack.pop_back();
+    }
+    else // there is else
+    {
+        Block newblock1;
+        block_stack.emplace_back(newblock1);
+
+        std::shared_ptr<AST> exp=root->left_child->right_child->right_child;
+
+        std::shared_ptr<AST> statement1=root->left_child->right_child->right_child->right_child->right_child;
+        std::shared_ptr<AST> statement2=statement1->right_child->right_child;
+
+        var_node condition_var=analyze_expression(exp);
+        std::string label1=ir.gen_label_name();
+        std::string label2=ir.gen_label_name();
+        std::string label3=ir.gen_label_name();
+
+        if(condition_var.type=="bool")
+            ir.add_ir("IF "+condition_var.bool_str+" GOTO "+label1);
+        else
+        {
+            std::string temp_zero_name="temp"+std::to_string(ir.num_temp++);
+            var_node temp_node=this->create_temp_var(temp_zero_name,"int");
+            ir.add_ir(temp_zero_name+" := #0");
+            ir.add_ir("IF "+ir.get_node_name(condition_var)+" != "+temp_zero_name+" GOTO "+label1);
+        }
+
+        ir.add_ir("GOTO "+ label2);
+        ir.add_ir("LABEL "+label1+" :");
+
+        analyze_statement(statement1);
+
+        ir.add_ir("GOTO "+label3);// for 'if'
+        block_stack.pop_back();
+
+        ir.add_ir("LABEL "+label2+" :"); //for 'else'
+
+        Block newblock2;
+        block_stack.emplace_back(newblock2);
+
+        analyze_statement(statement2);
+        ir.add_ir("LABEL "+label3+" :");
+        block_stack.pop_back();
+
+    }
+
 }
 
 void ir_gen::analyze_compound_statement(const std::shared_ptr<AST> &root)
