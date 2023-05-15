@@ -22,7 +22,17 @@ ir_gen(){};
 
 
 
-return_msg analyze_tree(std::shared_ptr<AST> root);
+void analyze_tree(const std::shared_ptr<AST> & root);
+
+void analyze_statement(const std::shared_ptr<AST> & root);
+
+void analyze_iteration_statement(const std::shared_ptr<AST> & root);
+
+void analyze_compound_statement(const std::shared_ptr<AST> & root);
+
+void analyze_function_definition(const std::shared_ptr<AST> &root);//// the return type is not consistent to the demo
+
+void analyze_declaration(const std::shared_ptr<AST>& root);// the return type is not consistent to the demo
 
 void analyze_init_declarator_list(std::shared_ptr<AST> root, std::string var_type) ;
 

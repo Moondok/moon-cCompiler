@@ -1,26 +1,97 @@
 #include <ir_gen.h>
 
-return_msg ir_gen::analyze_tree(std::shared_ptr<AST> root)
+void ir_gen::analyze_tree(const std::shared_ptr<AST> &root)
 {
     if (root==nullptr)
-        return return_msg(true,"none",-1,-1);
+        return ;
 
     else if (root->name=="declaration")
-        return analyze_declaration(root);
+        analyze_declaration(root);
 
     else if (root->name=="statement")
-        return analyze_statement(root);
+        analyze_statement(root);
     
     else if(root->name=="function_definition")
-        return analyze_function_definition(root);
+        analyze_function_definition(root);
     
     else
     {
-
+        analyze_tree(root->left_child);
+        analyze_tree(root->right_child);
     }
 }
 
-ir_gen:: analyze_declaration(std::shared_ptr<AST> root)
+void ir_gen::analyze_iteration_statement(const std::shared_ptr<AST> & root)
+{
+
+}
+
+void ir_gen::analyze_compound_statement(const std::shared_ptr<AST> &root)
+{
+    analyze_tree(root);
+}
+
+void ir_gen::analyze_function_definition(const std::shared_ptr<AST> &root)
+{
+    std::shared_ptr<AST> type_specifier=root->left_child;
+    std::shared_ptr<AST> declarator=root->left_child->right_child;
+    std::shared_ptr<AST> compound_statement=root->left_child->right_child->right_child;
+
+    std::string rtype=type_specifier->left_child->content;
+    std::string func_name=declarator->left_child->left_child->content;
+
+    bool has_declaration=false;
+    func_node declared_func;
+    if(this->func_pool.find(func_name)!=func_pool.end())
+    {
+        if(func_pool[func_name].is_defined==true)
+            error_msg="function "+func_name+" is already defined.\n";
+        else
+        {
+            has_declaration=true;
+            declared_func=func_pool[func_name]; // temporary variable for compare paralist
+            //func_pool.erase(func_pool.find(func_name));
+
+        }
+
+    }
+    Block new_fun_block;
+    new_fun_block.is_func=true;
+    new_fun_block.func.name=func_name;
+    new_fun_block.func.rtype=rtype;
+
+    block_stack.emplace_back(new_fun_block);
+    if(has_declaration==false)
+        func_pool.insert(std::make_pair(func_name,new_fun_block.func));
+    
+    ir.add_ir("FUNCTION "+func_name+" :");
+
+    if(declarator->left_child->right_child->right_child->name=="parameter_list")
+        analyze_parameter_list(declarator->left_child->right_child->right_child,func_name,true);//parameters written in blocks
+    
+    func_node func=func_pool[func_name];
+
+    if(has_declaration)
+    {
+        if(func.rtype!=declared_func.rtype)
+            error_msg="the return type when function declared is not match when it is defined.\n";
+        if(func.para_list.size()!=declared_func.para_list.size())
+            error_msg="the number of parameters when function declared is not match when it is defined.\n";
+
+        for(unsigned int i=0;i<func.para_list.size();i++)
+            if(func.para_list[i].type!=declared_func.para_list[i].type)
+                error_msg="the parameter "+func.para_list[i].name+" 's type does not match the function declared before.\n";
+            
+    }
+
+    new_fun_block.func=func;
+
+    analyze_compound_statement(compound_statement);
+
+    block_stack.pop_back();
+}
+
+void ir_gen:: analyze_declaration(const std::shared_ptr<AST> &root) // the return type is not consistent to the demo
 {
     std::string error_msg="";
     std::string var_type=root->left_child->name;
