@@ -1,5 +1,7 @@
 #include <ir_gen.h>
 
+//about line 530 , the definition of array is pending
+
 void ir_gen::analyze_tree(const std::shared_ptr<AST> &root)
 {
     if (root==nullptr)
@@ -37,6 +39,7 @@ void ir_gen::analyze_iteration_statement(const std::shared_ptr<AST> & root)
         std::string label3=ir.gen_label_name();
 
         block_stack.back().break_label=label3;
+        block_stack.back().start_label=label1; //speciallt set for 'continue'
 
         ir.add_ir("LABEL "+label1+" :");
 
@@ -101,7 +104,123 @@ void ir_gen::analyze_iteration_statement(const std::shared_ptr<AST> & root)
 
     else if(root->left_child->name=="FOR")
     {
+        if(root->left_child->right_child->right_child->name=="expression_statement")
+        {
+            
+            Block new_block;
+            new_block.can_break=true;
+            block_stack.emplace_back(new_block);
 
+            std::shared_ptr<AST> exp_statement1=root->left_child->right_child->right_child;
+            std::shared_ptr<AST> exp_statement2=exp_statement1->right_child;
+
+            std::string label1=ir.gen_label_name();
+            std::string label2=ir.gen_label_name();
+            std::string label3=ir.gen_label_name();
+
+            block_stack.back().break_label=label3;
+            block_stack.back().start_label=label1;
+
+            analyze_expression_statement(exp_statement1);
+
+            ir.add_ir("GOTO "+label1+" :");
+
+            if(exp_statement2->left_child->name=="expression")
+            {
+                var_node condition_var;
+                condition_var=analyze_expression(exp_statement2->left_child);
+                if(condition_var.type=="bool")
+                    ir.add_ir("IF "+condition_var.bool_str+ " GOTO "+label2);
+                else
+                {
+                    std::string temp_zero_name="temp"+std::to_string(ir.num_temp++);
+                    var_node new_node=create_temp_var(temp_zero_name,"int");
+                    ir.add_ir(temp_zero_name+" := #0");
+                    ir.add_ir("IF "+ir.get_node_name(condition_var)+ " != "+temp_zero_name);
+                }
+            }
+            else
+                ir.add_ir("GOTO "+label2); // unconditional jump ,will not terminate
+
+            ir.add_ir("GOTO "+label3);
+            ir.add_ir("LABEL "+label2+" :");
+
+
+            std::shared_ptr<AST> statement=nullptr;
+            if(exp_statement2->right_child->right_child->name=="statement")
+                statement=exp_statement2->right_child->right_child;
+            else
+            {
+                std::shared_ptr<AST> exp=exp_statement2->right_child;
+                statement=exp->right_child;
+                analyze_expression(exp);
+            }
+            analyze_statement(statement);
+
+            ir.add_ir("GOTO "+label1);
+            ir.add_ir("LABEL "+label3+ " :");
+
+            block_stack.pop_back();
+            
+        }
+        else //start with declaration
+        {
+            Block new_block;
+            new_block.can_break=true;
+            block_stack.emplace_back(new_block);
+
+            std::shared_ptr<AST> declaration=root->left_child->right_child->right_child;
+            std::shared_ptr<AST> exp_statement=declaration->right_child;
+
+            std::string label1=ir.gen_label_name();
+            std::string label2=ir.gen_label_name();
+            std::string label3=ir.gen_label_name();
+
+            block_stack.back().break_label=label3;
+            block_stack.back().start_label=label1;
+
+            analyze_declaration(declaration);
+
+            ir.add_ir("GOTO "+label1+" :");
+
+            if(exp_statement->left_child->name=="expression")
+            {
+                var_node condition_var;
+                condition_var=analyze_expression(exp_statement->left_child);
+                if(condition_var.type=="bool")
+                    ir.add_ir("IF "+condition_var.bool_str+ " GOTO "+label2);
+                else
+                {
+                    std::string temp_zero_name="temp"+std::to_string(ir.num_temp++);
+                    var_node new_node=create_temp_var(temp_zero_name,"int");
+                    ir.add_ir(temp_zero_name+" := #0");
+                    ir.add_ir("IF "+ir.get_node_name(condition_var)+ " != "+temp_zero_name);
+                }
+            }
+            else
+                ir.add_ir("GOTO "+label2); // unconditional jump ,will not terminate
+
+            ir.add_ir("GOTO "+label3);
+            ir.add_ir("LABEL "+label2+" :");
+
+
+            std::shared_ptr<AST> statement=nullptr;
+            if(exp_statement->right_child->right_child->name=="statement")
+                statement=exp_statement->right_child->right_child;
+            else
+            {
+                std::shared_ptr<AST> exp=exp_statement->right_child;
+                statement=exp->right_child;
+                analyze_expression(exp);
+            }
+            analyze_statement(statement);
+
+            ir.add_ir("GOTO "+label1);
+            ir.add_ir("LABEL "+label3+ " :");
+
+            block_stack.pop_back();
+        }
+         
     }
 }
 
@@ -128,11 +247,51 @@ void ir_gen::analyze_expression_statement(const std::shared_ptr<AST> &root)
 
 void ir_gen::analyze_jump_statement(const std::shared_ptr<AST> & root)
 {
+    if(error_infos.size())
+        return;
     
+    if(root->left_child->name=="BREAK")
+    {
+        int block_id=this->get_break_block_id();
+        if(block_id==-1)
+            error_infos.emplace_back(error_info("can not break this scope.\n",root->line,root->col));
+        ir.add_ir("GOTO "+block_stack[block_id].break_label);
+    }
+
+    else if(root->left_child->name=="RETURN")
+    {
+        std::string rtype=get_func_rtype();
+        if(rtype=="")
+            error_infos.emplace_back(error_info("can not return in a non-function scope.\n",root->line,root->col));
+        
+        if(root->left_child->right_child->name=="expression") //return something
+        {
+            var_node rnode=analyze_expression(root->left_child->right_child);
+            if(rnode.type!=rtype)
+                error_infos.emplace_back(error_info("return value error.\n",root->line,root->col));
+            ir.add_ir(ir.gen_return_ir(rnode));
+        }
+        else if(root->left_child->right_child->name=="l")// no return value
+        {
+            if(rtype!="void")
+                error_infos.emplace_back(error_info("return value needed.\n",root->line,root->line));
+            ir.add_ir("RETURN");
+
+        }
+    }
+    else if(root->left_child->name=="CONTINUE")
+    {
+        int block_id=this->get_break_block_id();
+        if(block_id==-1)
+            error_infos.emplace_back(error_info("'continue' is illegal in this scope.\n",root->line,root->col)); // only in loop statement , continue is legal.
+        ir.add_ir("GOTO "+block_stack.at(block_id).start_label);
+    }
 }
 
 void ir_gen::analyze_selection_statement(const std::shared_ptr<AST> & root)
 {
+    if(error_infos.size())
+        return;
     // no else
     if(root->left_child->right_child->right_child->right_child->right_child->right_child==nullptr)
     {
@@ -211,11 +370,15 @@ void ir_gen::analyze_selection_statement(const std::shared_ptr<AST> & root)
 
 void ir_gen::analyze_compound_statement(const std::shared_ptr<AST> &root)
 {
+    if(error_infos.size())
+        return ;
     analyze_tree(root);
 }
 
 void ir_gen::analyze_function_definition(const std::shared_ptr<AST> &root)
 {
+    if(error_infos.size())
+        return ;
     std::shared_ptr<AST> type_specifier=root->left_child;
     std::shared_ptr<AST> declarator=root->left_child->right_child;
     std::shared_ptr<AST> compound_statement=root->left_child->right_child->right_child;
@@ -228,7 +391,7 @@ void ir_gen::analyze_function_definition(const std::shared_ptr<AST> &root)
     if(this->func_pool.find(func_name)!=func_pool.end())
     {
         if(func_pool[func_name].is_defined==true)
-            error_msg="function "+func_name+" is already defined.\n";
+            error_infos.emplace_back(error_info("function "+func_name+" is already defined.\n",root->line,root->col));
         else
         {
             has_declaration=true;
@@ -257,13 +420,13 @@ void ir_gen::analyze_function_definition(const std::shared_ptr<AST> &root)
     if(has_declaration)
     {
         if(func.rtype!=declared_func.rtype)
-            error_msg="the return type when function declared is not match when it is defined.\n";
+            error_infos.emplace_back(error_info("the return type when function declared is not match when it is defined.\n",root->line,root->col));
         if(func.para_list.size()!=declared_func.para_list.size())
-            error_msg="the number of parameters when function declared is not match when it is defined.\n";
+            error_infos.emplace_back(error_info("the number of parameters when function declared is not match when it is defined.\n",root->line,root->col));
 
         for(unsigned int i=0;i<func.para_list.size();i++)
             if(func.para_list[i].type!=declared_func.para_list[i].type)
-                error_msg="the parameter "+func.para_list[i].name+" 's type does not match the function declared before.\n";
+                error_infos.emplace_back(error_info("the parameter "+func.para_list[i].name+" 's type does not match the function declared before.\n",root->line,root->col));
             
     }
 
@@ -276,14 +439,15 @@ void ir_gen::analyze_function_definition(const std::shared_ptr<AST> &root)
 
 void ir_gen:: analyze_declaration(const std::shared_ptr<AST> &root) // the return type is not consistent to the demo
 {
-    std::string error_msg="";
+    if(error_infos.size())
+        return;
     std::string var_type=root->left_child->name;
 
     if (root->left_child->right_child->name==";")
         return ; // don't know how to process     type_specifier ;
 
     if( var_type=="VOID")
-        error_msg="can not assign value to \"void\" type";
+        error_infos.emplace_back(error_info("can not assign value to \"void\" type",root->line,root->col));
     
     else
     {
@@ -294,6 +458,8 @@ void ir_gen:: analyze_declaration(const std::shared_ptr<AST> &root) // the retur
 
 void ir_gen::analyze_init_declarator_list(std::shared_ptr<AST> root, std::string type)
 {
+    if(error_infos.size())
+        return ;
     if(root->left_child->name=="init_declarator_list")
         analyze_init_declarator_list(root->left_child,type);
     else if(root->left_child->name=="init_declarator")
@@ -305,6 +471,8 @@ void ir_gen::analyze_init_declarator_list(std::shared_ptr<AST> root, std::string
 
 void ir_gen::analyze_init_declarator(const std::shared_ptr<AST> & root, std::string var_type) //analyze_declararor is hidden in this function implicitly
 {
+    if(error_infos.size())
+        return ;
     std::shared_ptr<AST> declarator=root->left_child;
 
     if(declarator->right_child==nullptr) // no initialization
@@ -322,7 +490,7 @@ void ir_gen::analyze_init_declarator(const std::shared_ptr<AST> & root, std::str
 
             }
             else
-                error_msg="multiple definitions for variable"+var_name+'\n';
+                error_infos.emplace_back(error_info("multiple definitions for variable"+var_name+'\n',root->line,root->col));
 
         }
 
@@ -334,7 +502,10 @@ void ir_gen::analyze_init_declarator(const std::shared_ptr<AST> & root, std::str
                 std::string func_name=declarator->left_child->left_child->content;
                 std::string func_rtype=var_type;
                 if (this->block_stack.size()>1)
-                    error_msg="function can not be defined in a block.\n";
+                {
+                    error_infos.emplace_back(error_info("function can not be defined in a block.\n",root->line,root->col));
+                    return;
+                }
                 
                 std::shared_ptr<AST> para_list=declarator->left_child->right_child->right_child;
                 func_node new_func;
@@ -358,8 +529,10 @@ void ir_gen::analyze_init_declarator(const std::shared_ptr<AST> & root, std::str
 
                 // this is an array's definition, we need an constant expression , to be done!
                 if(rnode.type!="int")
-                    error_msg="the size of an array must be an constant int.\n";
-
+                {
+                    error_infos.emplace_back(error_info("the size of an array must be an constant int.\n",root->line,root->col));
+                    return;
+                }
                 // for the array's size is an constant ,i do not plan to add perform a calculate ir here.
                 array_node new_array_node(arr_name,arr_type,ir.num_arr++); // to be done: add the representation of capacity.
                 ir.add_ir("ARRAY "+ir.gen_array_name(new_array_node)+" "+rnode.name);//to be done: here rnode.name is just a placeholder, we need a string representing capacity here!!!
@@ -381,7 +554,7 @@ void ir_gen::analyze_init_declarator(const std::shared_ptr<AST> & root, std::str
                 this->block_stack.back().var_map.insert(std::make_pair(new_var_name,new_var_node));
             }
             else
-                error_msg="multiple definitions for variable "+new_var_name+".\n";
+                error_infos.emplace_back(error_info("multiple definitions for variable "+new_var_name+".\n",root->line,root->col));
         }
         std::shared_ptr<AST> initializer=declarator->right_child->right_child;
         if(initializer->left_child->name=="assignment_expression")
@@ -389,7 +562,7 @@ void ir_gen::analyze_init_declarator(const std::shared_ptr<AST> & root, std::str
             var_node rnode=this->analyze_assignment_expression(initializer->left_child);
 
             if(rnode.type!=var_type)
-                error_msg="must use same type to perform initialization.\n";
+                error_infos.emplace_back(error_info("must use same type to perform initialization.\n",root->line,root->col));
             std::string re="var"+std::to_string(new_var_node.id)+=" := ";
             if(rnode.id==-1)
                 re+=rnode.name;
@@ -402,6 +575,8 @@ void ir_gen::analyze_init_declarator(const std::shared_ptr<AST> & root, std::str
 
 void ir_gen::analyze_parameter_list(const std::shared_ptr<AST>& root,std::string func_name, bool definite)
 {
+    if(error_infos.size())
+        return ;
     if(root->left_child->name=="parameter_list")
         analyze_parameter_list(root->left_child,func_name,definite);
     else
@@ -416,8 +591,10 @@ void ir_gen::analyze_parameter_list(const std::shared_ptr<AST>& root,std::string
 
 void ir_gen::analyze_parameter_declaration(const std::shared_ptr<AST>& root,const std::string &func_name, bool definite)
 {
+    if(error_infos.size())
+        return;
     if(root->left_child->left_child->name=="VOID")
-        this->error_msg="can not define a variable with \'void\' type\n";
+        error_infos.emplace_back(error_info("can not define a variable with \'void\' type\n",root->line,root->col));
 
     std::shared_ptr<AST> declarator=root->left_child->right_child; // we do not take abstract declarator for now
     std::string var_name=declarator->left_child->content; // the parameter is a single parameter instead of complex ones
@@ -442,6 +619,9 @@ void ir_gen::analyze_parameter_declaration(const std::shared_ptr<AST>& root,cons
 
 var_node ir_gen::analyze_assignment_expression(std::shared_ptr<AST> assign_exp)
 {
+    if(error_infos.size())
+        return var_node();// may cause error,warning
+
     if(assign_exp->left_child->name=="logical_or_expression")
     {
         std::shared_ptr<AST> logical_or_exp=assign_exp->left_child;
@@ -460,7 +640,7 @@ var_node ir_gen::analyze_assignment_expression(std::shared_ptr<AST> assign_exp)
         block_stack.back().var_map.insert(std::make_pair(temp_name,tmp_node));
 
         if(left_node.type!=right_node.type)
-            error_msg="two operands must have the same type.\n";
+            error_infos.emplace_back(error_info("two operands must have the same type.\n",assign_exp->line,assign_exp->col));
 
         if(op=="MUL_ASSIGN")
             ir.add_ir(ir.gen_binary_operation_ir(temp_name,left_node,right_node,"*"));
@@ -469,7 +649,7 @@ var_node ir_gen::analyze_assignment_expression(std::shared_ptr<AST> assign_exp)
         else if(op=="MOD_ASSIGN")
         {
             if(left_node.type!="int")
-                error_msg="two operands for '%' operation must be int.\n";
+                error_infos.emplace_back(error_info("two operands for '%' operation must be int.\n",assign_exp->line,assign_exp->col));
             ir.add_ir(ir.gen_binary_operation_ir(temp_name,left_node,right_node,"%"));
         }
         else if(op=="ADD_ASSIGN")
@@ -479,7 +659,7 @@ var_node ir_gen::analyze_assignment_expression(std::shared_ptr<AST> assign_exp)
         else
         {
             if(left_node.type!="int")
-                error_msg="two operands for this operation must be int.\n";
+                error_infos.emplace_back(error_info("two operands for this operation must be int.\n",assign_exp->line,assign_exp->col));
             if(op=="LEFT_ASSIGN")
                 ir.add_ir(ir.gen_binary_operation_ir(temp_name,left_node,right_node,"<<"));
             else if(op=="RIGHT_ASSIGN")
@@ -504,6 +684,9 @@ var_node ir_gen::analyze_assignment_expression(std::shared_ptr<AST> assign_exp)
 
 var_node ir_gen::analyze_logical_or_expression(const std::shared_ptr<AST>& logical_or_exp)
 {
+    if(error_infos.size())
+        return var_node();
+
     if(logical_or_exp->left_child->name=="logical_and_expression")
     {
         std::shared_ptr<AST> logical_and_exp=logical_or_exp->left_child;
@@ -513,7 +696,7 @@ var_node ir_gen::analyze_logical_or_expression(const std::shared_ptr<AST>& logic
     var_node operand2=analyze_logical_and_expression(logical_or_exp->left_child->right_child->right_child);
 
     if(operand1.type!="bool"||operand2.type!="bool")
-        error_msg="logical or operation can only be performed between bool type.\n";
+        error_infos.emplace_back(error_info("logical or operation can only be performed between bool type.\n",logical_or_exp->line,logical_or_exp->col));
     
     std::string result_temp_name="temp"+std::to_string(ir.num_temp++);
     var_node result_node=this->create_temp_var(result_temp_name,operand1.type);
@@ -527,6 +710,8 @@ var_node ir_gen::analyze_logical_or_expression(const std::shared_ptr<AST>& logic
 
 var_node ir_gen::analyze_logical_and_expression(const std::shared_ptr<AST> &logical_and_exp)
 {
+    if(error_infos.size())
+        return var_node();
     if(logical_and_exp->left_child->name=="inclusive_or_expression")
     {
         std::shared_ptr<AST> inclusive_or_exp=logical_and_exp->left_child;
@@ -536,7 +721,7 @@ var_node ir_gen::analyze_logical_and_expression(const std::shared_ptr<AST> &logi
     var_node operand2=analyze_exclusive_or_expression(logical_and_exp->left_child->right_child->right_child);
 
     if(operand1.type!="bool"||operand2.type!="bool")
-        error_msg="logical and operation can only be performed between bool type.\n";
+        error_infos.emplace_back(error_info("logical and operation can only be performed between bool type.\n",logical_and_exp->line,logical_and_exp->col));
     
     std::string result_temp_name="temp"+std::to_string(ir.num_temp++);
     var_node result_node=this->create_temp_var(result_temp_name,operand1.type);
@@ -550,6 +735,9 @@ var_node ir_gen::analyze_logical_and_expression(const std::shared_ptr<AST> &logi
 
 var_node ir_gen::analyze_inclusive_or_expression(const std::shared_ptr<AST> &inclusive_or_exp)
 {
+    if(error_infos.size())
+        return var_node();
+
     if(inclusive_or_exp->left_child->name=="exclusive_or_expression")
     {
         std::shared_ptr<AST> exclusive_or_exp=inclusive_or_exp->left_child;
@@ -559,8 +747,10 @@ var_node ir_gen::analyze_inclusive_or_expression(const std::shared_ptr<AST> &inc
     var_node operand2=analyze_exclusive_or_expression(inclusive_or_exp->left_child->right_child->right_child);
 
     if(operand1.type!="int"||operand2.type!="int")
-        error_msg="inclusive or operation can only be performed between int type.\n";
-    
+    {
+        error_infos.emplace_back(error_info("inclusive or operation can only be performed between int type.\n",inclusive_or_exp->line,inclusive_or_exp->col));
+        return var_node();
+    }
     std::string result_temp_name="temp"+std::to_string(ir.num_temp++);
     var_node result_node=this->create_temp_var(result_temp_name,operand1.type);
 
@@ -572,6 +762,8 @@ var_node ir_gen::analyze_inclusive_or_expression(const std::shared_ptr<AST> &inc
 
 var_node ir_gen::analyze_exclusive_or_expression(const std::shared_ptr<AST> &exclusive_or_exp)
 {
+    if(error_infos.size())
+        return var_node();
     if(exclusive_or_exp->left_child->name=="and_expression")
     {
         std::shared_ptr<AST> and_exp=exclusive_or_exp->left_child;
@@ -581,8 +773,10 @@ var_node ir_gen::analyze_exclusive_or_expression(const std::shared_ptr<AST> &exc
     var_node operand2=analyze_and_expression(exclusive_or_exp->left_child->right_child->right_child);
 
     if(operand1.type!="int"||operand2.type!="int")
-        error_msg="exclusive or operation can only be performed between int type.\n";
-    
+    {
+        error_infos.emplace_back(error_info("exclusive or operation can only be performed between int type.\n",exclusive_or_exp->line,exclusive_or_exp->col));
+        return var_node();
+    }
     std::string result_temp_name="temp"+std::to_string(ir.num_temp++);
     var_node result_node=this->create_temp_var(result_temp_name,operand1.type);
 
@@ -594,6 +788,9 @@ var_node ir_gen::analyze_exclusive_or_expression(const std::shared_ptr<AST> &exc
 
 var_node ir_gen::analyze_and_expression(const std::shared_ptr<AST> & and_exp)
 {
+    if(error_infos.size())
+        return var_node();
+
     if(and_exp->left_child->name=="equality_expression")
     {
         std::shared_ptr<AST> equality_exp=and_exp->left_child;
@@ -603,7 +800,10 @@ var_node ir_gen::analyze_and_expression(const std::shared_ptr<AST> & and_exp)
     var_node operand2=analyze_equality_expression(and_exp->left_child->right_child->right_child);
 
     if(operand1.type!="int"||operand2.type!="int")
-        error_msg="and operation can only be performed between int type.\n";
+    {
+        error_infos.emplace_back(error_info("and operation can only be performed between int type.\n",and_exp->line,and_exp->col));
+        return var_node();
+    }
     
     std::string result_temp_name="temp"+std::to_string(ir.num_temp++);
     var_node result_node=this->create_temp_var(result_temp_name,operand1.type);
@@ -616,6 +816,8 @@ var_node ir_gen::analyze_and_expression(const std::shared_ptr<AST> & and_exp)
 
 var_node ir_gen::analyze_equality_expression(const std::shared_ptr<AST> &  equality_exp)
 {
+    if(error_infos.size())
+        return var_node();
     if(equality_exp->left_child->name=="relational_expression")
     {
         std::shared_ptr<AST> relational_exp=equality_exp->left_child;
@@ -629,8 +831,11 @@ var_node ir_gen::analyze_equality_expression(const std::shared_ptr<AST> &  equal
     var_node operand2=analyze_relational_expression(equality_exp->left_child->right_child->right_child);
 
     if(operand1.type!=operand2.type)
-        error_msg="can not compare variables in different type.\n";
-    
+    {
+        error_infos.emplace_back(error_info("can not compare variables in different type.\n",equality_exp->line,equality_exp->col));
+        return var_node();
+    }
+
     std::string result_temp_name="temp"+std::to_string(ir.num_temp++);
     var_node result_node=this->create_temp_var(result_temp_name,"bool");
 
@@ -645,6 +850,8 @@ var_node ir_gen::analyze_equality_expression(const std::shared_ptr<AST> &  equal
 
 var_node ir_gen::analyze_relational_expression(const std::shared_ptr<AST> & relational_exp)
 {
+    if(error_infos.size())
+        return var_node();
     if(relational_exp->left_child->name=="shift_expression")
     {
         std::shared_ptr<AST> shift_exp=relational_exp->left_child;
@@ -658,8 +865,11 @@ var_node ir_gen::analyze_relational_expression(const std::shared_ptr<AST> & rela
     var_node operand2=analyze_shift_expression(relational_exp->left_child->right_child->right_child);
 
     if(operand1.type!=operand2.type)
-        error_msg="can not compare variables in different type.\n";
-    
+    {
+        error_infos.emplace_back(error_info("can not compare variables in different type.\n",relational_exp->line,relational_exp->col));
+        return var_node();
+    }
+
     std::string result_temp_name="temp"+std::to_string(ir.num_temp++);
     var_node result_node=this->create_temp_var(result_temp_name,"bool");//  the result of comparison
 
@@ -675,6 +885,9 @@ var_node ir_gen::analyze_relational_expression(const std::shared_ptr<AST> & rela
 
 var_node ir_gen::analyze_shift_expression(const std::shared_ptr<AST> & shift_exp)
 {
+    if(error_infos.size())
+        return var_node();
+
     if(shift_exp->left_child->name=="additive_expression")
     {
         std::shared_ptr<AST>  additive_exp=shift_exp->left_child;
@@ -688,8 +901,11 @@ var_node ir_gen::analyze_shift_expression(const std::shared_ptr<AST> & shift_exp
     var_node operand2=analyze_additive_expression(shift_exp->left_child->right_child->right_child);
 
     if(operand1.type!="int"||operand2.type!="int")
-        error_msg="can only exexute shift calcucation in int type.\n";
-    
+    {
+        error_infos.emplace_back(error_info("can only exexute shift calcucation in int type.\n",shift_exp->line,shift_exp->col));
+        return var_node();
+    }
+
     std::string result_temp_name="temp"+std::to_string(ir.num_temp++);
     var_node result_node=this->create_temp_var(result_temp_name,operand1.type);
 
@@ -703,6 +919,9 @@ var_node ir_gen::analyze_shift_expression(const std::shared_ptr<AST> & shift_exp
 
 var_node ir_gen::analyze_additive_expression(const std::shared_ptr<AST> & additive_exp)
 {
+    if(error_infos.size())
+        return var_node();
+
     if(additive_exp->left_child->name=="multiplicative_expression")
     {
         std::shared_ptr<AST> multiplicative_exp=additive_exp->left_child;
@@ -712,7 +931,10 @@ var_node ir_gen::analyze_additive_expression(const std::shared_ptr<AST> & additi
     var_node operand2=analyze_multiplicative_expression(additive_exp->left_child->right_child->right_child);
 
     if(operand1.type!=operand2.type)
-        error_msg="can not exexute calcucation in between different operand.\n";
+    {
+        error_infos.emplace_back(error_info("can not exexute calcucation in between different operand.\n",additive_exp->line,additive_exp->col));
+        return var_node();
+    }
     
     std::string result_temp_name="temp"+std::to_string(ir.num_temp++);
     var_node result_node=this->create_temp_var(result_temp_name,operand1.type);
@@ -726,6 +948,9 @@ var_node ir_gen::analyze_additive_expression(const std::shared_ptr<AST> & additi
 
 var_node ir_gen::analyze_multiplicative_expression(const std::shared_ptr<AST> & multiplicative_exp)
 {
+    if(error_infos.size())
+        return var_node();
+
     if(multiplicative_exp->left_child->name=="unary_expression")
     {
         std::shared_ptr<AST> unary_exp=multiplicative_exp->left_child;
@@ -735,8 +960,11 @@ var_node ir_gen::analyze_multiplicative_expression(const std::shared_ptr<AST> & 
     var_node operand2=analyze_unary_expression(multiplicative_exp->left_child->right_child->right_child);
 
     if(operand1.type!=operand2.type)
-        error_msg="can not exexute calcucation in between different operand.\n";
-    
+    {
+        error_infos.emplace_back(error_info("can not exexute calcucation in between different operand.\n",multiplicative_exp->line,multiplicative_exp->col));
+        return var_node();
+    }
+
     std::string result_temp_name="temp"+std::to_string(ir.num_temp++);
     var_node result_node=this->create_temp_var(result_temp_name,operand1.type);
 
@@ -749,6 +977,8 @@ var_node ir_gen::analyze_multiplicative_expression(const std::shared_ptr<AST> & 
 //++a; 
 var_node ir_gen:: analyze_unary_expression(const std::shared_ptr<AST> &  unary_exp)
 {
+    if(error_infos.size())
+        return var_node();
     if(unary_exp->left_child->name=="postfix_expression")
     {
         std::shared_ptr<AST> postfix_exp=unary_exp->left_child;
@@ -758,7 +988,10 @@ var_node ir_gen:: analyze_unary_expression(const std::shared_ptr<AST> &  unary_e
     {
         var_node rnode=analyze_unary_expression(unary_exp->left_child->right_child);
         if(rnode.type!="int")
-            error_msg="\'++\' operation only suits for int .\n";
+        {
+            error_infos.emplace_back(error_info("\'++\' operation only suits for int .\n",unary_exp->line,unary_exp->col));
+            return var_node();
+        }
 
         std::string temp_name="temp"+std::to_string(ir.num_temp++);
         var_node constant_node=this->create_temp_var(temp_name,"int");
@@ -774,7 +1007,10 @@ var_node ir_gen:: analyze_unary_expression(const std::shared_ptr<AST> &  unary_e
     {
         var_node rnode=analyze_unary_expression(unary_exp->left_child->right_child);
         if(rnode.type!="int")
-            error_msg="\'--\' operation only suits for int .\n";
+        {
+            error_infos.emplace_back(error_info("\'--\' operation only suits for int .\n",unary_exp->line,unary_exp->col));
+            return var_node();
+        }
 
         std::string temp_name="temp"+std::to_string(ir.num_temp++);
         var_node constant_node=this->create_temp_var(temp_name,"int");
@@ -793,13 +1029,13 @@ var_node ir_gen:: analyze_unary_expression(const std::shared_ptr<AST> &  unary_e
         if(op=="+")
         {
             if(rnode.type!="int"&&rnode.type!="double"&&rnode.type!="float")
-                error_msg="operator \'+\' can only be used in numerical tyoe.\n";
+                error_infos.emplace_back(error_info("operator \'+\' can only be used in numerical tyoe.\n",unary_exp->line,unary_exp->col));
             return rnode;
         }
         else if(op=="-")
         {
             if(rnode.type!="int"&&rnode.type!="double"&&rnode.type!="float")
-                error_msg="operator \'+\' can only be used in numerical tyoe.\n";
+                error_infos.emplace_back(error_info("operator \'+\' can only be used in numerical tyoe.\n",unary_exp->line,unary_exp->col));
             
             std::string temp_name="temp"+std::to_string(ir.num_temp++);
 
@@ -818,7 +1054,7 @@ var_node ir_gen:: analyze_unary_expression(const std::shared_ptr<AST> &  unary_e
         else if(op=="~") // only suitable for int ,implemented by xor 
         {
             if(rnode.type!="int")
-                error_msg="operator \'~\' can only be used in numerical tyoe.\n";
+                error_infos.emplace_back(error_info("operator \'~\' can only be used in numerical tyoe.\n",unary_exp->line,unary_exp->col));
             
             std::string temp_name="temp"+std::to_string(ir.num_temp++);
 
@@ -844,6 +1080,9 @@ var_node ir_gen:: analyze_unary_expression(const std::shared_ptr<AST> &  unary_e
 //a++ a--, a(), a[] ,a
 var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix_exp)
 {
+    if(error_infos.size())
+        return var_node();
+
     if(postfix_exp->left_child->name=="primary_expression")
     {
         std::shared_ptr<AST> primary_exp=postfix_exp->left_child;
@@ -856,8 +1095,10 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
         var_node length_node=analyze_expression(exp);
         array_node new_array_node=loopup_array(array_name);
         if(new_array_node.num==-1)
-            error_msg="undefined array "+array_name;
-
+        {
+            error_infos.emplace_back(error_info("undefined array "+array_name,postfix_exp->line,postfix_exp->col));
+            return var_node();
+        }
         std::string temp_name="temp"+std::to_string(ir.num_var);
         var_node new_temp_var(temp_name,new_array_node.type,ir.num_temp++,true);
         this->block_stack.back().var_map.insert(std::make_pair(temp_name,new_temp_var));
@@ -901,7 +1142,11 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
             
             var_node new_var_node; // restore the return value of a function call.
             if(func_pool.find(func_name)==func_pool.end())
-                error_msg="undefined function "+func_name;
+            {
+                error_infos.emplace_back(error_info("undefined function "+func_name,postfix_exp->line,postfix_exp->col));
+                return var_node();
+            }
+
             if(postfix_exp->left_child->right_child->right_child->name=="argument_expression_list")
             {
                 std::shared_ptr<AST> argument_expression_list=postfix_exp->left_child->right_child->right_child;
@@ -924,8 +1169,10 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
         {
             var_node current_node=analyze_postfix_expression(postfix_exp->left_child);
             if(current_node.type!="int")
-                error_msg="\'++\' operation only suits for int .\n";
-            
+            {
+                error_infos.emplace_back(error_info("\'++\' operation only suits for int .\n",postfix_exp->line,postfix_exp->col));
+                return var_node();
+            }
             std::string temp_name="temp"+std::to_string(ir.num_temp++);
             var_node return_node=this->create_temp_var(temp_name,"int");
             block_stack.back().var_map.insert(std::make_pair(temp_name,return_node));
@@ -946,8 +1193,10 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
         {
             var_node current_node=analyze_postfix_expression(postfix_exp->left_child);
             if(current_node.type!="int")
-                error_msg="\'--\' operation only suits for int .\n";
-
+            {
+                error_infos.emplace_back(error_info("\'--\' operation only suits for int .\n",postfix_exp->line,postfix_exp->col));
+                return var_node();
+            }
             std::string temp_name="temp"+std::to_string(ir.num_temp++);
             var_node return_node=this->create_temp_var(temp_name,"int");
             block_stack.back().var_map.insert(std::make_pair(temp_name,return_node));
@@ -968,6 +1217,9 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
 
 var_node ir_gen::analyze_primary_expression(const std::shared_ptr<AST> & primary_exp)
 {
+    if(error_infos.size())
+        return var_node();
+
     if(primary_exp->left_child->name=="IDENTIFIER")
     {
         //find it in the table built in var table in current block
@@ -975,7 +1227,7 @@ var_node ir_gen::analyze_primary_expression(const std::shared_ptr<AST> & primary
 
         var_node node=this->loopup_node(var_name);
         if(node.id==-1)
-            error_msg="undefined variable "+var_name+".\n";
+            error_infos.emplace_back(error_info("undefined variable "+var_name+".\n",primary_exp->line,primary_exp->col));
         return node;
     }
 
@@ -1024,7 +1276,8 @@ var_node ir_gen::analyze_primary_expression(const std::shared_ptr<AST> & primary
 
 var_node ir_gen::analyze_expression(const std::shared_ptr<AST> & exp)
 {
-    
+    if(error_infos.size())
+        return var_node();
     
     if (exp->left_child->name=="assignment_expression")
         return analyze_assignment_expression(exp->left_child);
@@ -1041,6 +1294,8 @@ var_node ir_gen::analyze_expression(const std::shared_ptr<AST> & exp)
 
 void ir_gen::analyze_argument_expression_list(const std::shared_ptr<AST> & node, std::string func_name)
 {
+    if(error_infos.size())
+        return;
     std::shared_ptr<AST> start=node->left_child;
     func_node func=this->func_pool[func_name];
     unsigned int cnt=0;
@@ -1054,19 +1309,25 @@ void ir_gen::analyze_argument_expression_list(const std::shared_ptr<AST> & node,
         start=start->left_child;
         cnt++;
         if(cnt>=func.para_list.size())
-            error_msg="too many atguments passed to our function.\n";
+        {
+            error_infos.emplace_back(error_info("too many atguments passed to our function.\n",node->line,node->col));
+            return;
+        }
         if(func.para_list[func.para_list.size()-cnt].type!=new_arg_node.type)
-            error_msg="the type of argument you passed is not match the type you defined.\n";
+        {
+            error_infos.emplace_back(error_info("the type of argument you passed is not match the type you defined.\n",node->line,node->col));
+            return;
+        }
     }
 
     var_node last_arg_node=analyze_assignment_expression(start);
     ir.add_ir(ir.gen_argument_ir(last_arg_node));
     cnt++;
     if(func.para_list[func.para_list.size()-cnt].type!=last_arg_node.type)
-        error_msg="the type of argument you passed is not match the type you defined.\n";
+        error_infos.emplace_back(error_info("the type of argument you passed is not match the type you defined.\n",node->line,node->col));
 
     if(cnt!=func.para_list.size())
-        error_msg="too less arguments passed in.\n";
+        error_infos.emplace_back(error_info("too less arguments passed in.\n",node->line,node->col));
         
 }
 
@@ -1104,4 +1365,22 @@ var_node ir_gen::create_temp_var(std::string var_name,std::string var_type)
 {
     var_node new_var_node(var_name,var_type);
     return new_var_node;
+}
+
+int ir_gen::get_break_block_id()
+{
+    unsigned int n=this->block_stack.size();
+    for(auto i=n-1;i>=0;i--)
+        if(block_stack.at(i).can_break)
+            return i;
+    return -1;
+}
+
+std::string ir_gen::get_func_rtype()
+{
+    unsigned int n=this->block_stack.size();
+    for(auto i=n-1;i>=0;i--)
+        if(block_stack.at(i).is_func)
+            return block_stack.at(i).func.rtype;
+    return "";
 }

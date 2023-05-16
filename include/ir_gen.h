@@ -20,6 +20,14 @@ IR ir;
 
 ir_gen(){};
 
+struct error_info
+{
+    std::string error_msg;
+    unsigned int line;
+    unsigned int col;
+    error_info(){};
+    error_info(std::string e,unsigned int l,unsigned int c):error_msg(e),line(l),col(c){};
+} ;
 
 
 void analyze_tree(const std::shared_ptr<AST> & root);
@@ -88,8 +96,12 @@ var_node create_temp_var(std::string var_name,std::string var_type);
 
 array_node loopup_array(std::string name);
 
+int get_break_block_id();
+
+std::string get_func_rtype();
+
 private:
-    std::string error_msg;
+    std::vector<error_info> error_infos;
 
     std::map<std::string, func_node> func_pool;
 

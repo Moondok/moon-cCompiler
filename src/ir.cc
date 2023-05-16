@@ -52,3 +52,23 @@ std::string IR::gen_label_name()
 {
     return "label"+std::to_string(num_label++);
 }
+
+std::string IR::gen_return_ir(var_node node)
+{
+    std::string re="RESULT ";
+    if(node.id==-1)
+        re+=node.name;
+    else 
+        re+="var"+std::to_string(node.id);
+}
+
+void IR::output_ir()
+{
+    std::ofstream f("ir.mcc");
+    if(!f.is_open())
+        std::cerr<<"can not open file for ir.\n";
+    else
+        for(auto & ir:ir_list)
+            f<<ir<<'\n';
+    f.close();
+}

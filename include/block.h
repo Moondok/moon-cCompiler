@@ -46,6 +46,7 @@ public:
     std::map<std::string,var_node > var_map;
     std::map<std::string,array_node> arr_map;
     std::string break_label;
+    std::string start_label;
 
     bool can_break=false;
 

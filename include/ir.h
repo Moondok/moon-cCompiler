@@ -4,6 +4,8 @@
 #include <vector>
 #include <string>
 #include <block.h>
+#include <fstream>
+#include <iostream>
 
 class IR
 {
@@ -23,6 +25,8 @@ public:
     std::string get_node_name(var_node node); // get the correct ir representation for a variable;
     std::string gen_array_name(array_node node);// same for the above
     std::string gen_label_name();
+    std::string gen_return_ir(var_node node);
+    void output_ir();
     void add_ir(std::string);
 
 
