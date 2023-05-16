@@ -7,7 +7,8 @@
 #include <memory>
 #include <block.h>
 #include <ir.h>
-
+#include <fstream>
+#include <iostream>
 
 typedef std::tuple<bool, std::string , unsigned int ,unsigned int> return_msg;
 
@@ -100,6 +101,7 @@ int get_break_block_id();
 
 std::string get_func_rtype();
 
+~ir_gen();
 private:
     std::vector<error_info> error_infos;
 

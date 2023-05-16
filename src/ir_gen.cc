@@ -1384,3 +1384,22 @@ std::string ir_gen::get_func_rtype()
             return block_stack.at(i).func.rtype;
     return "";
 }
+
+// output ir file or error file
+ir_gen:: ~ir_gen()
+{
+    if(error_infos.size())
+    {
+        std::ofstream f("errors.log");
+        if(!f.is_open())
+            std::cerr<<"can not create error log file.\n";
+        else
+            for(const auto & error:error_infos)
+                f<<error.error_msg<<'\n';
+
+        f.close();
+        
+    }
+    else 
+        ir.output_ir();
+}
