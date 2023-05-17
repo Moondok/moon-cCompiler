@@ -102,6 +102,8 @@ int get_break_block_id();
 
 std::string get_func_rtype();
 
+bool get_result();
+
 ~ir_gen();
 private:
     std::vector<error_info> error_infos;

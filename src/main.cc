@@ -4,6 +4,7 @@
 #include <fstream>
 #include <sstream>
 #include <util.h>
+#include <ir_gen.h>
 
 int main(int argc,char* argv[])
 {
@@ -50,6 +51,17 @@ int main(int argc,char* argv[])
 
     std::cout<<std::get<0>(r)<<' '<<std::get<1>(r);
     std::cout<<std::get<2>(r)<<' '<<std::get<3>(r);
+
+    ir_gen ir_generator;
+    if(root!=nullptr)
+        ir_generator.analyze_tree(root);
+
+    bool ir_gen_re=ir_generator.get_result();
+
+    if(ir_gen_re)
+        std::cout<<"ir success\n";
+    else   
+        std::cout<<"ir success\n";
 
     return 0;
 }

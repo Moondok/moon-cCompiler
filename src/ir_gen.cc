@@ -1397,10 +1397,9 @@ std::string ir_gen::get_func_rtype()
     return "";
 }
 
-// output ir file or error file
-ir_gen:: ~ir_gen()
+bool ir_gen::get_result()
 {
-    if(error_infos.size())
+    if(error_infos.size()!=0)
     {
         std::ofstream f("errors.log");
         if(!f.is_open())
@@ -1410,8 +1409,15 @@ ir_gen:: ~ir_gen()
                 f<<error.error_msg<<'\n';
 
         f.close();
-        
+        return false;
     }
     else 
+    {
         ir.output_ir();
+        return true;
+    }
 }
+
+// output ir file or error file
+ir_gen:: ~ir_gen()
+{}
