@@ -14,7 +14,7 @@ public:
 
     std::string name;
     std::string type;
-    unsigned int id;
+    int id;
     std::string bool_str="";
     var_node(std::string n,std::string t,unsigned int i=-1,bool is_arr=false):name(n),type(t),id(i),is_addr(is_arr){};
     var_node():name(""),type(""),id(-1){};

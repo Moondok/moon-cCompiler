@@ -60,6 +60,8 @@ std::string IR::gen_return_ir(var_node node)
         re+=node.name+"_"+node.type;
     else 
         re+="var"+std::to_string(node.id)+"_"+node.type;
+
+    return re;
 }
 
 void IR::output_ir()

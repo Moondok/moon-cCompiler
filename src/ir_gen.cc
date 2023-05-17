@@ -195,7 +195,7 @@ void ir_gen::analyze_iteration_statement(const std::shared_ptr<AST> & root)
                 {
                     std::string temp_zero_name="temp"+std::to_string(ir.num_temp++);
                     var_node new_node=create_temp_var(temp_zero_name,"int");
-                    ir.add_ir(temp_zero_name+" := #0");
+                    ir.add_ir(temp_zero_name+"_int"+" := #0");
                     ir.add_ir("IF "+ir.get_node_name(condition_var)+ " != "+temp_zero_name+"_int"+ " GOTO "+label2);
                 }
             }
@@ -345,7 +345,7 @@ void ir_gen::analyze_selection_statement(const std::shared_ptr<AST> & root)
         {
             std::string temp_zero_name="temp"+std::to_string(ir.num_temp++);
             var_node temp_node=this->create_temp_var(temp_zero_name,"int");
-            ir.add_ir(temp_zero_name+" := #0");
+            ir.add_ir(temp_zero_name+"_int"+" := #0");
             ir.add_ir("IF "+ir.get_node_name(condition_var)+" != "+temp_zero_name+"_int"+" GOTO "+label1);
         }
 
@@ -443,7 +443,7 @@ void ir_gen:: analyze_declaration(const std::shared_ptr<AST> &root) // the retur
 {
     if(error_infos.size())
         return;
-    std::string var_type=root->left_child->name;
+    std::string var_type=root->left_child->content;
 
     if (root->left_child->right_child->name==";")
         return ; // don't know how to process     type_specifier ;
@@ -572,7 +572,7 @@ void ir_gen::analyze_init_declarator(const std::shared_ptr<AST> & root, std::str
                 error_infos.emplace_back(error_info("must use same type to perform initialization.\n",root->line,root->col));
             std::string re="var"+std::to_string(new_var_node.id)+"_"+new_var_node.type+" := ";
             if(rnode.id==-1)
-                re+=rnode.name;
+                re+=rnode.name+"_"+rnode.type;
             else
                 re+="var"+std::to_string(rnode.id)+"_"+var_type;
             ir.add_ir(re);
@@ -589,7 +589,7 @@ void ir_gen::analyze_parameter_list(const std::shared_ptr<AST>& root,std::string
     else
         analyze_parameter_declaration(root->left_child,func_name,definite);
     
-    if(root->left_child->right_child->name==",")
+    if(root->left_child->right_child!=nullptr&&root->left_child->right_child->name==",")
     {
         analyze_parameter_declaration(root->left_child->right_child->right_child,func_name,definite);
 
@@ -616,6 +616,7 @@ void ir_gen::analyze_parameter_declaration(const std::shared_ptr<AST>& root,cons
     }
 
     func_pool[func_name].para_list.emplace_back(new_var);
+    block_stack.back().var_map.insert(std::make_pair(var_name,new_var));
 
     if(definite)
     {
@@ -1275,7 +1276,7 @@ var_node ir_gen::analyze_primary_expression(const std::shared_ptr<AST> & primary
         var_node new_var_node=create_temp_var(temp_var_name,"double");
         this->block_stack.back().var_map.insert(std::make_pair(temp_var_name,new_var_node));
 
-        ir.add_ir(temp_var_name+" := #f"+ content); // we will distinguish int and float here later.
+        ir.add_ir(temp_var_name+"_float"+" := #f"+ content); // we will distinguish int and float here later.
         return new_var_node;
     }
 
