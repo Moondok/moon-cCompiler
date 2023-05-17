@@ -1,0 +1,20 @@
+FUNCTION func :
+param var0_int
+param var1_int
+temp0_int := var0_int + var1_int
+RETURN temp0_int
+FUNCTION main :
+temp1_int := #10
+ARRAY array0_int 10
+temp2_double := #f5.3
+var2_double := temp2_double
+temp3_int := #1
+var3_int := temp3_int
+temp4_int := #99
+var4_int := temp4_int
+arg var4_int
+arg var3_int
+temp5:= call func
+var5_int := temp5_int
+temp6_int := #0
+RETURN temp6_int

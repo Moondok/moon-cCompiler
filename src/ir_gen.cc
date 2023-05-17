@@ -1107,7 +1107,7 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
             error_infos.emplace_back(error_info("undefined array "+array_name,postfix_exp->line,postfix_exp->col));
             return var_node();
         }
-        std::string temp_name="temp"+std::to_string(ir.num_var);
+        std::string temp_name="temp"+std::to_string(ir.num_temp);
         var_node new_temp_var(temp_name,new_array_node.type,ir.num_temp++,true);
         this->block_stack.back().var_map.insert(std::make_pair(temp_name,new_temp_var));
 
@@ -1142,84 +1142,86 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
             ir.add_ir(temp_name+"_"+new_array_node.type+" :=&"+ir.gen_array_name(new_array_node)+" + "+temp_index_name+"_int");
             return new_temp_var;
         }
+    }
+
         
-        else if (postfix_exp->left_child->right_child->name=="(")
+    else if (postfix_exp->left_child->right_child->name=="(")
+    {
+        std::string func_name=postfix_exp->left_child->left_child->left_child->content;
+        func_node func=func_pool[func_name];
+        
+        var_node new_var_node; // restore the return value of a function call.
+        if(func_pool.find(func_name)==func_pool.end())
         {
-            std::string func_name=postfix_exp->left_child->left_child->left_child->content;
-            func_node func=func_pool[func_name];
-            
-            var_node new_var_node; // restore the return value of a function call.
-            if(func_pool.find(func_name)==func_pool.end())
-            {
-                error_infos.emplace_back(error_info("undefined function "+func_name,postfix_exp->line,postfix_exp->col));
-                return var_node();
-            }
-
-            if(postfix_exp->left_child->right_child->right_child->name=="argument_expression_list")
-            {
-                std::shared_ptr<AST> argument_expression_list=postfix_exp->left_child->right_child->right_child;
-                analyze_argument_expression_list(argument_expression_list,func_name);
-            }
-
-            if(func.rtype=="void")
-                ir.add_ir("call "+func_name);
-            else
-            {
-                std::string temp_name="temp"+std::to_string(ir.num_temp++);
-                new_var_node=this->create_temp_var(temp_name,func.rtype);
-                ir.add_ir(temp_name+"call "+func_name);
-            }
-
-            return new_var_node;
-
+            error_infos.emplace_back(error_info("undefined function "+func_name,postfix_exp->line,postfix_exp->col));
+            return var_node();
         }
-        else if(postfix_exp->left_child->right_child->name=="INC_OP")
+
+        if(postfix_exp->left_child->right_child->right_child->name=="argument_expression_list")
         {
-            var_node current_node=analyze_postfix_expression(postfix_exp->left_child);
-            if(current_node.type!="int")
-            {
-                error_infos.emplace_back(error_info("\'++\' operation only suits for int .\n",postfix_exp->line,postfix_exp->col));
-                return var_node();
-            }
+            std::shared_ptr<AST> argument_expression_list=postfix_exp->left_child->right_child->right_child;
+            analyze_argument_expression_list(argument_expression_list,func_name);
+        }
+
+        if(func.rtype=="void")
+            ir.add_ir("call "+func_name);
+        else
+        {
             std::string temp_name="temp"+std::to_string(ir.num_temp++);
-            var_node return_node=this->create_temp_var(temp_name,"int");
-            block_stack.back().var_map.insert(std::make_pair(temp_name,return_node));
-
-            std::string temp_constant_name="temp"+std::to_string(ir.num_temp++);
-            var_node constant_var_node=this->create_temp_var(temp_constant_name,"int");
-            block_stack.back().var_map.insert(std::make_pair(temp_constant_name,constant_var_node));
-
-            ir.add_ir(temp_constant_name+"_int"+" := #1");
-
-            ir.add_ir(temp_name+"_int"=" :="+ir.get_node_name(current_node)); // the return value remains the value of vurrent var
-            ir.add_ir(ir.get_node_name(current_node)+" := "+ir.get_node_name(current_node)+" + "+temp_constant_name+"_int");
-
-            return return_node;
+            new_var_node=this->create_temp_var(temp_name,func.rtype);
+            ir.add_ir(temp_name+":= call "+func_name);
         }
 
-        else if(postfix_exp->left_child->right_child->name=="DEC_OP")
+        return new_var_node;
+
+    }
+    else if(postfix_exp->left_child->right_child->name=="INC_OP")
+    {
+        var_node current_node=analyze_postfix_expression(postfix_exp->left_child);
+        if(current_node.type!="int")
         {
-            var_node current_node=analyze_postfix_expression(postfix_exp->left_child);
-            if(current_node.type!="int")
-            {
-                error_infos.emplace_back(error_info("\'--\' operation only suits for int .\n",postfix_exp->line,postfix_exp->col));
-                return var_node();
-            }
-            std::string temp_name="temp"+std::to_string(ir.num_temp++);
-            var_node return_node=this->create_temp_var(temp_name,"int");
-            block_stack.back().var_map.insert(std::make_pair(temp_name,return_node));
-
-            std::string temp_constant_name="temp"+std::to_string(ir.num_temp++);
-            var_node constant_var_node=this->create_temp_var(temp_constant_name,"int");
-            block_stack.back().var_map.insert(std::make_pair(temp_constant_name,constant_var_node));
-
-            ir.add_ir(temp_constant_name+"_int"+" := #1");
-
-            ir.add_ir(temp_name+"_int"=" :="+ir.get_node_name(current_node)); // the return value remains the value of vurrent var
-            ir.add_ir(ir.get_node_name(current_node)+" := "+ir.get_node_name(current_node)+" - "+temp_constant_name+"_int");
-
-            return return_node;
+            error_infos.emplace_back(error_info("\'++\' operation only suits for int .\n",postfix_exp->line,postfix_exp->col));
+            return var_node();
         }
+        std::string temp_name="temp"+std::to_string(ir.num_temp++);
+        var_node return_node=this->create_temp_var(temp_name,"int");
+        block_stack.back().var_map.insert(std::make_pair(temp_name,return_node));
+
+        std::string temp_constant_name="temp"+std::to_string(ir.num_temp++);
+        var_node constant_var_node=this->create_temp_var(temp_constant_name,"int");
+        block_stack.back().var_map.insert(std::make_pair(temp_constant_name,constant_var_node));
+
+        ir.add_ir(temp_constant_name+"_int"+" := #1");
+
+        ir.add_ir(temp_name+"_int"=" :="+ir.get_node_name(current_node)); // the return value remains the value of vurrent var
+        ir.add_ir(ir.get_node_name(current_node)+" := "+ir.get_node_name(current_node)+" + "+temp_constant_name+"_int");
+
+        return return_node;
+    }
+
+    else if(postfix_exp->left_child->right_child->name=="DEC_OP")
+    {
+        var_node current_node=analyze_postfix_expression(postfix_exp->left_child);
+        if(current_node.type!="int")
+        {
+            error_infos.emplace_back(error_info("\'--\' operation only suits for int .\n",postfix_exp->line,postfix_exp->col));
+            return var_node();
+        }
+        std::string temp_name="temp"+std::to_string(ir.num_temp++);
+        var_node return_node=this->create_temp_var(temp_name,"int");
+        block_stack.back().var_map.insert(std::make_pair(temp_name,return_node));
+
+        std::string temp_constant_name="temp"+std::to_string(ir.num_temp++);
+        var_node constant_var_node=this->create_temp_var(temp_constant_name,"int");
+        block_stack.back().var_map.insert(std::make_pair(temp_constant_name,constant_var_node));
+
+        ir.add_ir(temp_constant_name+"_int"+" := #1");
+
+        ir.add_ir(temp_name+"_int"=" :="+ir.get_node_name(current_node)); // the return value remains the value of vurrent var
+        ir.add_ir(ir.get_node_name(current_node)+" := "+ir.get_node_name(current_node)+" - "+temp_constant_name+"_int");
+
+        return return_node;
+        
     }
 }
 
@@ -1241,7 +1243,7 @@ var_node ir_gen::analyze_primary_expression(const std::shared_ptr<AST> & primary
 
     else if(primary_exp->left_child->name=="TRUE"||primary_exp->left_child->name=="FALSE")
     {
-        std::string temp_var_name="temp"+std::to_string(ir.num_var++);
+        std::string temp_var_name="temp"+std::to_string(ir.num_temp++);
         var_node new_var_node=create_temp_var(temp_var_name,"bool");
         this->block_stack.back().var_map.insert(std::make_pair(temp_var_name,new_var_node));
 
@@ -1256,7 +1258,7 @@ var_node ir_gen::analyze_primary_expression(const std::shared_ptr<AST> & primary
     else if (primary_exp->left_child->name=="CONSTANT_INT")
     {
         std::string content=primary_exp->left_child->content;
-        std::string temp_var_name="temp"+std::to_string(ir.num_var++);
+        std::string temp_var_name="temp"+std::to_string(ir.num_temp++);
         var_node new_var_node=create_temp_var(temp_var_name,"int");
         this->block_stack.back().var_map.insert(std::make_pair(temp_var_name,new_var_node));
 
@@ -1272,11 +1274,11 @@ var_node ir_gen::analyze_primary_expression(const std::shared_ptr<AST> & primary
     else if (primary_exp->left_child->name=="CONSTANT_DOUBLE")
     {
         std::string content=primary_exp->left_child->content;
-        std::string temp_var_name="temp"+std::to_string(ir.num_var++);
+        std::string temp_var_name="temp"+std::to_string(ir.num_temp++);
         var_node new_var_node=create_temp_var(temp_var_name,"double");
         this->block_stack.back().var_map.insert(std::make_pair(temp_var_name,new_var_node));
 
-        ir.add_ir(temp_var_name+"_float"+" := #f"+ content); // we will distinguish int and float here later.
+        ir.add_ir(temp_var_name+"_double"+" := #f"+ content); // we will distinguish int and float here later.
         return new_var_node;
     }
 
