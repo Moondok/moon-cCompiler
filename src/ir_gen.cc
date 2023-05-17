@@ -125,7 +125,7 @@ void ir_gen::analyze_iteration_statement(const std::shared_ptr<AST> & root)
 
             analyze_expression_statement(exp_statement1);
 
-            ir.add_ir("GOTO "+label1+" :");
+            ir.add_ir(label1+" :");
 
             if(exp_statement2->left_child->name=="expression")
             {
@@ -150,14 +150,18 @@ void ir_gen::analyze_iteration_statement(const std::shared_ptr<AST> & root)
 
             std::shared_ptr<AST> statement=nullptr;
             if(exp_statement2->right_child->right_child->name=="statement")
+            {
                 statement=exp_statement2->right_child->right_child;
+                analyze_statement(statement);
+            }
             else
             {
                 std::shared_ptr<AST> exp=exp_statement2->right_child;
-                statement=exp->right_child;
+                statement=exp->right_child->right_child;
+                analyze_statement(statement);
                 analyze_expression(exp);
             }
-            analyze_statement(statement);
+            
 
             ir.add_ir("GOTO "+label1);
             ir.add_ir("LABEL "+label3+ " :");
@@ -208,14 +212,18 @@ void ir_gen::analyze_iteration_statement(const std::shared_ptr<AST> & root)
 
             std::shared_ptr<AST> statement=nullptr;
             if(exp_statement->right_child->right_child->name=="statement")
+            {
                 statement=exp_statement->right_child->right_child;
+                analyze_statement(statement);
+            }
             else
             {
                 std::shared_ptr<AST> exp=exp_statement->right_child;
-                statement=exp->right_child;
+                statement=exp->right_child->right_child;
+                analyze_statement(statement);
                 analyze_expression(exp);
             }
-            analyze_statement(statement);
+            
 
             ir.add_ir("GOTO "+label1);
             ir.add_ir("LABEL "+label3+ " :");
@@ -543,6 +551,7 @@ void ir_gen::analyze_init_declarator(const std::shared_ptr<AST> & root, std::str
                 // for the array's size is an constant ,i do not plan to add perform a calculate ir here.
                 array_node new_array_node(arr_name,arr_type,ir.num_arr++); // to be done: add the representation of capacity.
                 ir.add_ir("ARRAY "+ir.gen_array_name(new_array_node)+" "+std::to_string(rnode.real_value));//to be done: here rnode.name is just a placeholder, we need a string representing capacity here!!!
+                block_stack.back().arr_map.insert(std::make_pair(arr_name,new_array_node));
             }
         }
     }
@@ -636,7 +645,7 @@ var_node ir_gen::analyze_assignment_expression(std::shared_ptr<AST> assign_exp)
         return this->analyze_logical_or_expression(logical_or_exp);
     }
     var_node left_node=analyze_unary_expression(assign_exp->left_child);
-    var_node right_node=analyze_assignment_expression(assign_exp->right_child->right_child);
+    var_node right_node=analyze_assignment_expression(assign_exp->left_child->right_child->right_child);
     var_node tmp_node;
     std::string op=assign_exp->left_child->right_child->left_child->name;
     if(op=="=")
@@ -1102,7 +1111,7 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
         std::shared_ptr<AST> exp=postfix_exp->left_child->right_child->right_child;
         var_node length_node=analyze_expression(exp);
         array_node new_array_node=loopup_array(array_name);
-        if(new_array_node.num==-1)
+        if(new_array_node.id==-1)
         {
             error_infos.emplace_back(error_info("undefined array "+array_name,postfix_exp->line,postfix_exp->col));
             return var_node();
@@ -1193,7 +1202,7 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
 
         ir.add_ir(temp_constant_name+"_int"+" := #1");
 
-        ir.add_ir(temp_name+"_int"=" :="+ir.get_node_name(current_node)); // the return value remains the value of vurrent var
+        ir.add_ir(temp_name+"_int"+" :="+ir.get_node_name(current_node)); // the return value remains the value of vurrent var
         ir.add_ir(ir.get_node_name(current_node)+" := "+ir.get_node_name(current_node)+" + "+temp_constant_name+"_int");
 
         return return_node;
@@ -1300,7 +1309,7 @@ var_node ir_gen::analyze_expression(const std::shared_ptr<AST> & exp)
     {
         var_node new_var_node=analyze_expression(exp->left_child);
         // maybe a "," exists, so we do not return directly.
-        var_node tmp_var_node=analyze_assignment_expression(exp->right_child->right_child);
+        var_node tmp_var_node=analyze_assignment_expression(exp->left_child->right_child->right_child);
         return new_var_node;
         // tmp_var_node 's value is not used , but some intermediate results matter.
     }
