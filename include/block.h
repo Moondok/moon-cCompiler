@@ -9,6 +9,9 @@ class var_node
 {
 public:
     bool is_addr; // a pointer
+    bool is_constant_int=true;  //special setting for array's initialization
+    int real_value; //same as above ,special setting for array's declaration
+
     std::string name;
     std::string type;
     unsigned int id;

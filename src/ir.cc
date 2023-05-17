@@ -6,7 +6,7 @@ void IR::add_ir(std::string new_code)
 
 std::string IR::gen_parameter_ir(var_node node)
 {
-    std::string re="param var"+std::to_string(node.id);
+    std::string re="param var"+std::to_string(node.id)+"_"+node.type;
     return re;
 }
 
@@ -14,36 +14,36 @@ std::string IR::gen_argument_ir(var_node node)
 {
     // here pointer are not considered for now
     if(node.id<0)// temp
-        return "arg "+node.name;
+        return "arg "+node.name+"_"+node.type;
     else // user defined variables
-        return "arg var"+std::to_string(node.id);
+        return "arg var"+std::to_string(node.id)+"_"+node.type;
 }
 
 std::string IR::get_node_name(var_node node) 
 {
     if(node.id<0)// temp variable
-        return node.name;
+        return node.name+"_"+node.type;
     else // a user defined variable
-        return ("var"+std::to_string(node.id));
+        return ("var"+std::to_string(node.id)+"_"+node.type);
 }
 
 std::string IR::gen_array_name(array_node node)
 {
-    return "array"+std::to_string(node.id);
+    return "array"+std::to_string(node.id)+"_"+node.type;
 }
 
 std::string IR::gen_binary_operation_ir(std::string result,var_node a,var_node b,std::string op)
 {
     std::string re=result+" := ";
     if(a.id==-1)
-        re+=a.name;
+        re+=a.name+"_"+a.type;
     else
-        re+="var"+std::to_string(a.id);
+        re+="var"+std::to_string(a.id)+"_"+a.type;
     re=re+" "+op+" ";
     if(b.id==-1)
-        re+=b.name;
+        re+=b.name+"_"+b.type;
     else
-        re+="var"+std::to_string(b.id);
+        re+="var"+std::to_string(b.id)+"_"+b.type;
 
     return re;
 }
@@ -55,11 +55,11 @@ std::string IR::gen_label_name()
 
 std::string IR::gen_return_ir(var_node node)
 {
-    std::string re="RESULT ";
+    std::string re="RETURN ";
     if(node.id==-1)
-        re+=node.name;
+        re+=node.name+"_"+node.type;
     else 
-        re+="var"+std::to_string(node.id);
+        re+="var"+std::to_string(node.id)+"_"+node.type;
 }
 
 void IR::output_ir()

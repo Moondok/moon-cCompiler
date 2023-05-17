@@ -1,6 +1,8 @@
 #include <ir_gen.h>
 
 //about line 530 , the definition of array is pending
+//about how to assign a value into a user-denied variable(especially element of array) is pending
+
 
 void ir_gen::analyze_tree(const std::shared_ptr<AST> &root)
 {
@@ -51,8 +53,8 @@ void ir_gen::analyze_iteration_statement(const std::shared_ptr<AST> & root)
         {
             std::string temp_zero_name="temp"+std::to_string(ir.num_temp++);
             var_node temp_node=this->create_temp_var(temp_zero_name,"int");
-            ir.add_ir(temp_zero_name+" := #0");
-            ir.add_ir("IF "+ir.get_node_name(condition_var)+" != "+temp_zero_name+ " GOTO "+label2);
+            ir.add_ir(temp_zero_name+"_int"+" := #0");
+            ir.add_ir("IF "+ir.get_node_name(condition_var)+" != "+temp_zero_name+"_int"+ " GOTO "+label2);
 
         }
 
@@ -94,8 +96,8 @@ void ir_gen::analyze_iteration_statement(const std::shared_ptr<AST> & root)
         {
             std::string temp_zero_name="temp"+std::to_string(ir.num_temp++);
             var_node temp_node=this->create_temp_var(temp_zero_name,"int");
-            ir.add_ir(temp_zero_name+" := #0");
-            ir.add_ir("IF "+ir.get_node_name(condition_var)+" != "+temp_zero_name+" GOTO "+label1);
+            ir.add_ir(temp_zero_name+"_int"+" := #0");
+            ir.add_ir("IF "+ir.get_node_name(condition_var)+" != "+temp_zero_name+"_int"+" GOTO "+label1);
 
         }
         ir.add_ir("LABEL "+label2+ " :");
@@ -135,8 +137,8 @@ void ir_gen::analyze_iteration_statement(const std::shared_ptr<AST> & root)
                 {
                     std::string temp_zero_name="temp"+std::to_string(ir.num_temp++);
                     var_node new_node=create_temp_var(temp_zero_name,"int");
-                    ir.add_ir(temp_zero_name+" := #0");
-                    ir.add_ir("IF "+ir.get_node_name(condition_var)+ " != "+temp_zero_name);
+                    ir.add_ir(temp_zero_name+"_int"+" := #0");
+                    ir.add_ir("IF "+ir.get_node_name(condition_var)+ " != "+temp_zero_name+"_int"+" GOTO "+label2);
                 }
             }
             else
@@ -194,7 +196,7 @@ void ir_gen::analyze_iteration_statement(const std::shared_ptr<AST> & root)
                     std::string temp_zero_name="temp"+std::to_string(ir.num_temp++);
                     var_node new_node=create_temp_var(temp_zero_name,"int");
                     ir.add_ir(temp_zero_name+" := #0");
-                    ir.add_ir("IF "+ir.get_node_name(condition_var)+ " != "+temp_zero_name);
+                    ir.add_ir("IF "+ir.get_node_name(condition_var)+ " != "+temp_zero_name+"_int"+ " GOTO "+label2);
                 }
             }
             else
@@ -312,8 +314,8 @@ void ir_gen::analyze_selection_statement(const std::shared_ptr<AST> & root)
         {
             std::string temp_zero_name="temp"+std::to_string(ir.num_temp++);
             var_node temp_node=this->create_temp_var(temp_zero_name,"int");
-            ir.add_ir(temp_zero_name+" := #0");
-            ir.add_ir("IF "+ir.get_node_name(condition_var)+" != "+temp_zero_name+" GOTO "+label1);
+            ir.add_ir(temp_zero_name+"_int"+" := #0");
+            ir.add_ir("IF "+ir.get_node_name(condition_var)+" != "+temp_zero_name+"_int"+" GOTO "+label1);
         }
         ir.add_ir("GOTO "+label2);
         ir.add_ir("LABEL "+label1+ " :");
@@ -344,7 +346,7 @@ void ir_gen::analyze_selection_statement(const std::shared_ptr<AST> & root)
             std::string temp_zero_name="temp"+std::to_string(ir.num_temp++);
             var_node temp_node=this->create_temp_var(temp_zero_name,"int");
             ir.add_ir(temp_zero_name+" := #0");
-            ir.add_ir("IF "+ir.get_node_name(condition_var)+" != "+temp_zero_name+" GOTO "+label1);
+            ir.add_ir("IF "+ir.get_node_name(condition_var)+" != "+temp_zero_name+"_int"+" GOTO "+label1);
         }
 
         ir.add_ir("GOTO "+ label2);
@@ -533,9 +535,14 @@ void ir_gen::analyze_init_declarator(const std::shared_ptr<AST> & root, std::str
                     error_infos.emplace_back(error_info("the size of an array must be an constant int.\n",root->line,root->col));
                     return;
                 }
+                else if(rnode.is_constant_int==false)
+                {
+                    error_infos.emplace_back(error_info("you can only define an array with constant value.\n",root->line,root->col));
+                    return ;
+                }
                 // for the array's size is an constant ,i do not plan to add perform a calculate ir here.
                 array_node new_array_node(arr_name,arr_type,ir.num_arr++); // to be done: add the representation of capacity.
-                ir.add_ir("ARRAY "+ir.gen_array_name(new_array_node)+" "+rnode.name);//to be done: here rnode.name is just a placeholder, we need a string representing capacity here!!!
+                ir.add_ir("ARRAY "+ir.gen_array_name(new_array_node)+" "+std::to_string(rnode.real_value));//to be done: here rnode.name is just a placeholder, we need a string representing capacity here!!!
             }
         }
     }
@@ -563,11 +570,11 @@ void ir_gen::analyze_init_declarator(const std::shared_ptr<AST> & root, std::str
 
             if(rnode.type!=var_type)
                 error_infos.emplace_back(error_info("must use same type to perform initialization.\n",root->line,root->col));
-            std::string re="var"+std::to_string(new_var_node.id)+=" := ";
+            std::string re="var"+std::to_string(new_var_node.id)+"_"+new_var_node.type+" := ";
             if(rnode.id==-1)
                 re+=rnode.name;
             else
-                re+="var"+std::to_string(rnode.id);
+                re+="var"+std::to_string(rnode.id)+"_"+var_type;
             ir.add_ir(re);
         }
     }
@@ -643,40 +650,40 @@ var_node ir_gen::analyze_assignment_expression(std::shared_ptr<AST> assign_exp)
             error_infos.emplace_back(error_info("two operands must have the same type.\n",assign_exp->line,assign_exp->col));
 
         if(op=="MUL_ASSIGN")
-            ir.add_ir(ir.gen_binary_operation_ir(temp_name,left_node,right_node,"*"));
+            ir.add_ir(ir.gen_binary_operation_ir(temp_name+"_"+tmp_node.type,left_node,right_node,"*"));
         else if(op=="DIV_ASSIGN")
-            ir.add_ir(ir.gen_binary_operation_ir(temp_name,left_node,right_node,"/"));
+            ir.add_ir(ir.gen_binary_operation_ir(temp_name+"_"+tmp_node.type,left_node,right_node,"/"));
         else if(op=="MOD_ASSIGN")
         {
             if(left_node.type!="int")
                 error_infos.emplace_back(error_info("two operands for '%' operation must be int.\n",assign_exp->line,assign_exp->col));
-            ir.add_ir(ir.gen_binary_operation_ir(temp_name,left_node,right_node,"%"));
+            ir.add_ir(ir.gen_binary_operation_ir(temp_name+"_"+tmp_node.type,left_node,right_node,"%"));
         }
         else if(op=="ADD_ASSIGN")
-            ir.add_ir(ir.gen_binary_operation_ir(temp_name,left_node,right_node,"+"));
+            ir.add_ir(ir.gen_binary_operation_ir(temp_name+"_"+tmp_node.type,left_node,right_node,"+"));
         else if(op=="SUB_ASSIGN")
-            ir.add_ir(ir.gen_binary_operation_ir(temp_name,left_node,right_node,"-"));
+            ir.add_ir(ir.gen_binary_operation_ir(temp_name+"_"+tmp_node.type,left_node,right_node,"-"));
         else
         {
             if(left_node.type!="int")
                 error_infos.emplace_back(error_info("two operands for this operation must be int.\n",assign_exp->line,assign_exp->col));
             if(op=="LEFT_ASSIGN")
-                ir.add_ir(ir.gen_binary_operation_ir(temp_name,left_node,right_node,"<<"));
+                ir.add_ir(ir.gen_binary_operation_ir(temp_name+"_"+tmp_node.type,left_node,right_node,"<<"));
             else if(op=="RIGHT_ASSIGN")
-                ir.add_ir(ir.gen_binary_operation_ir(temp_name,left_node,right_node,">>"));
+                ir.add_ir(ir.gen_binary_operation_ir(temp_name+"_"+tmp_node.type,left_node,right_node,">>"));
             else if(op=="AND_ASSIGN")
-                ir.add_ir(ir.gen_binary_operation_ir(temp_name,left_node,right_node,"&"));
+                ir.add_ir(ir.gen_binary_operation_ir(temp_name+"_"+tmp_node.type,left_node,right_node,"&"));
             else if(op=="OR_ASSIGN")
-                ir.add_ir(ir.gen_binary_operation_ir(temp_name,left_node,right_node,"|"));
+                ir.add_ir(ir.gen_binary_operation_ir(temp_name+"_"+tmp_node.type,left_node,right_node,"|"));
             else if(op=="XOR_ASSIGN")
-                ir.add_ir(ir.gen_binary_operation_ir(temp_name,left_node,right_node,"^"));
+                ir.add_ir(ir.gen_binary_operation_ir(temp_name+"_"+tmp_node.type,left_node,right_node,"^"));
         }
     }
-    std::string new_code="var"+std::to_string(left_node.id)+" := ";
+    std::string new_code="var"+std::to_string(left_node.id)+"_"+left_node.type+" := ";
     if(tmp_node.id==-1)
-        new_code+=tmp_node.name;
+        new_code+=tmp_node.name+"_"+tmp_node.type;
     else
-        new_code+="var"+std::to_string(tmp_node.id);
+        new_code+="var"+std::to_string(tmp_node.id)+"_"+tmp_node.type;
     
     return left_node;
     
@@ -702,7 +709,7 @@ var_node ir_gen::analyze_logical_or_expression(const std::shared_ptr<AST>& logic
     var_node result_node=this->create_temp_var(result_temp_name,operand1.type);
 
     block_stack.back().var_map.insert(std::make_pair(result_temp_name,result_node));
-    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name,operand1,operand2,"||")); //logical and operator &&
+    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name+"_int",operand1,operand2,"||")); //logical and operator && // note that _int is for register
     result_node.bool_str=ir.get_node_name(operand1)+" || "+ir.get_node_name(operand2);
     
     return result_node;
@@ -727,7 +734,7 @@ var_node ir_gen::analyze_logical_and_expression(const std::shared_ptr<AST> &logi
     var_node result_node=this->create_temp_var(result_temp_name,operand1.type);
 
     block_stack.back().var_map.insert(std::make_pair(result_temp_name,result_node));
-    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name,operand1,operand2,"&&")); //logical and operator &&
+    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name+"_int",operand1,operand2,"&&")); //logical and operator &&
     result_node.bool_str=ir.get_node_name(operand1)+" && "+ir.get_node_name(operand2);
     
     return result_node;
@@ -755,7 +762,7 @@ var_node ir_gen::analyze_inclusive_or_expression(const std::shared_ptr<AST> &inc
     var_node result_node=this->create_temp_var(result_temp_name,operand1.type);
 
     block_stack.back().var_map.insert(std::make_pair(result_temp_name,result_node));
-    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name,operand1,operand2,inclusive_or_exp->left_child->right_child->name));
+    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name+"_int",operand1,operand2,inclusive_or_exp->left_child->right_child->name));
 
     return result_node;
 }
@@ -781,7 +788,7 @@ var_node ir_gen::analyze_exclusive_or_expression(const std::shared_ptr<AST> &exc
     var_node result_node=this->create_temp_var(result_temp_name,operand1.type);
 
     block_stack.back().var_map.insert(std::make_pair(result_temp_name,result_node));
-    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name,operand1,operand2,exclusive_or_exp->left_child->right_child->name));
+    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name+"_int",operand1,operand2,exclusive_or_exp->left_child->right_child->name));
 
     return result_node;
 }
@@ -809,7 +816,7 @@ var_node ir_gen::analyze_and_expression(const std::shared_ptr<AST> & and_exp)
     var_node result_node=this->create_temp_var(result_temp_name,operand1.type);
 
     block_stack.back().var_map.insert(std::make_pair(result_temp_name,result_node));
-    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name,operand1,operand2,and_exp->left_child->right_child->name));
+    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name+"_int",operand1,operand2,and_exp->left_child->right_child->name));
 
     return result_node;
 }
@@ -840,7 +847,7 @@ var_node ir_gen::analyze_equality_expression(const std::shared_ptr<AST> &  equal
     var_node result_node=this->create_temp_var(result_temp_name,"bool");
 
     block_stack.back().var_map.insert(std::make_pair(result_temp_name,result_node));
-    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name,operand1,operand2,op));
+    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name+"_int",operand1,operand2,op));
 
     // 
     result_node.bool_str=ir.get_node_name(operand1)+" "+op+" "+ir.get_node_name(operand2);// for selection statement
@@ -874,7 +881,7 @@ var_node ir_gen::analyze_relational_expression(const std::shared_ptr<AST> & rela
     var_node result_node=this->create_temp_var(result_temp_name,"bool");//  the result of comparison
 
     block_stack.back().var_map.insert(std::make_pair(result_temp_name,result_node));
-    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name,operand1,operand2,op));
+    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name+"_int",operand1,operand2,op));
 
     // 
     result_node.bool_str=ir.get_node_name(operand1)+" "+op+" "+ir.get_node_name(operand2);// for selection statement
@@ -910,7 +917,7 @@ var_node ir_gen::analyze_shift_expression(const std::shared_ptr<AST> & shift_exp
     var_node result_node=this->create_temp_var(result_temp_name,operand1.type);
 
     block_stack.back().var_map.insert(std::make_pair(result_temp_name,result_node));
-    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name,operand1,operand2,op));
+    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name+"_int",operand1,operand2,op));
 
     return result_node;
 
@@ -940,7 +947,7 @@ var_node ir_gen::analyze_additive_expression(const std::shared_ptr<AST> & additi
     var_node result_node=this->create_temp_var(result_temp_name,operand1.type);
 
     block_stack.back().var_map.insert(std::make_pair(result_temp_name,result_node));
-    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name,operand1,operand2,additive_exp->left_child->right_child->name));
+    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name+"_"+operand1.type,operand1,operand2,additive_exp->left_child->right_child->name));
 
     return result_node;
 
@@ -969,7 +976,7 @@ var_node ir_gen::analyze_multiplicative_expression(const std::shared_ptr<AST> & 
     var_node result_node=this->create_temp_var(result_temp_name,operand1.type);
 
     block_stack.back().var_map.insert(std::make_pair(result_temp_name,result_node));
-    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name,operand1,operand2,multiplicative_exp->left_child->right_child->name));
+    ir.add_ir(ir.gen_binary_operation_ir(result_temp_name+"_"+operand1.type,operand1,operand2,multiplicative_exp->left_child->right_child->name));
 
     return result_node;
 }
@@ -996,10 +1003,10 @@ var_node ir_gen:: analyze_unary_expression(const std::shared_ptr<AST> &  unary_e
         std::string temp_name="temp"+std::to_string(ir.num_temp++);
         var_node constant_node=this->create_temp_var(temp_name,"int");
         block_stack.back().var_map.insert(std::make_pair(temp_name,constant_node));
-        ir.add_ir(temp_name+" := #1");
+        ir.add_ir(temp_name+"_int"+" := #1");
 
         //for ++a 's return value is a+1, there is no need to create a brand new variable
-        ir.add_ir(ir.get_node_name(rnode)+" := "+ir.get_node_name(rnode)+" + "+temp_name);
+        ir.add_ir(ir.get_node_name(rnode)+" := "+ir.get_node_name(rnode)+" + "+temp_name+"_int");
 
         return rnode;
     }
@@ -1015,10 +1022,10 @@ var_node ir_gen:: analyze_unary_expression(const std::shared_ptr<AST> &  unary_e
         std::string temp_name="temp"+std::to_string(ir.num_temp++);
         var_node constant_node=this->create_temp_var(temp_name,"int");
         block_stack.back().var_map.insert(std::make_pair(temp_name,constant_node));
-        ir.add_ir(temp_name+" := #1");
+        ir.add_ir(temp_name+"_int"+" := #1");
 
         //for ++a 's return value is a+1, there is no need to create a brand new variable
-        ir.add_ir(ir.get_node_name(rnode)+" := "+ir.get_node_name(rnode)+" - "+temp_name);
+        ir.add_ir(ir.get_node_name(rnode)+" := "+ir.get_node_name(rnode)+" - "+temp_name+"_int");
 
     }
     else if(unary_exp->left_child->name=="unary_operator")
@@ -1029,13 +1036,13 @@ var_node ir_gen:: analyze_unary_expression(const std::shared_ptr<AST> &  unary_e
         if(op=="+")
         {
             if(rnode.type!="int"&&rnode.type!="double"&&rnode.type!="float")
-                error_infos.emplace_back(error_info("operator \'+\' can only be used in numerical tyoe.\n",unary_exp->line,unary_exp->col));
+                error_infos.emplace_back(error_info("operator \'+\' can only be used in numerical type.\n",unary_exp->line,unary_exp->col));
             return rnode;
         }
         else if(op=="-")
         {
             if(rnode.type!="int"&&rnode.type!="double"&&rnode.type!="float")
-                error_infos.emplace_back(error_info("operator \'+\' can only be used in numerical tyoe.\n",unary_exp->line,unary_exp->col));
+                error_infos.emplace_back(error_info("operator \'+\' can only be used in numerical type.\n",unary_exp->line,unary_exp->col));
             
             std::string temp_name="temp"+std::to_string(ir.num_temp++);
 
@@ -1043,12 +1050,12 @@ var_node ir_gen:: analyze_unary_expression(const std::shared_ptr<AST> &  unary_e
             var_node zero_node=this->create_temp_var(temp_name,rnode.type);
             block_stack.back().var_map.insert(std::make_pair(temp_name,zero_node));
 
-            ir.add_ir(temp_name+" := #0");
+            ir.add_ir(temp_name+"_"+rnode.type+" := #0");
 
             std::string return_temp_name="temp"+std::to_string(ir.num_temp++);
             var_node new_node=create_temp_var(return_temp_name,rnode.type);
             block_stack.back().var_map.insert(std::make_pair(return_temp_name,new_node));
-            ir.add_ir(return_temp_name+" :="+temp_name+" - "+ir.get_node_name(rnode));
+            ir.add_ir(return_temp_name+"_"+rnode.type+" :="+temp_name+"_"+rnode.type+" - "+ir.get_node_name(rnode));
             return new_node;
         }
         else if(op=="~") // only suitable for int ,implemented by xor 
@@ -1062,13 +1069,13 @@ var_node ir_gen:: analyze_unary_expression(const std::shared_ptr<AST> &  unary_e
             var_node zero_node=this->create_temp_var(temp_name,rnode.type);
             block_stack.back().var_map.insert(std::make_pair(temp_name,zero_node));
 
-            ir.add_ir(temp_name+" := #-2147483648"); //11111111(32 bits)
+            ir.add_ir(temp_name+"_int"+" := #-2147483648"); //11111111(32 bits)
 
             std::string return_temp_name="temp"+std::to_string(ir.num_temp++);
             var_node new_node=create_temp_var(return_temp_name,rnode.type);
             block_stack.back().var_map.insert(std::make_pair(return_temp_name,new_node));
             // by performing 1111 ^ a ,inverse a's every bit.
-            ir.add_ir(return_temp_name+" :="+temp_name+" ^ "+ir.get_node_name(rnode));//same for exclusive or
+            ir.add_ir(return_temp_name+"_int"+" :="+temp_name+"_int"+" ^ "+ir.get_node_name(rnode));//same for exclusive or
             return new_node;
         }
     
@@ -1116,8 +1123,8 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
                 var_node temp_var3(temp_constant_name,"int");
                 block_stack.back().var_map.insert(std::make_pair(temp_constant_name,temp_var3));
 
-                ir.add_ir(temp_constant_name+" :=#4");
-                ir.add_ir(temp_index_name+ " :="+ir.get_node_name(length_node)+" * "+temp_index_name);
+                ir.add_ir(temp_constant_name+"_int"+" :=#4");
+                ir.add_ir(temp_index_name+"_int"+ " :="+ir.get_node_name(length_node)+" * "+temp_constant_name+"_int");
             }
 
             else if(new_array_node.type=="double")
@@ -1126,12 +1133,12 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
                 var_node temp_var3(temp_constant_name,"int");
                 this->block_stack.back().var_map.insert(std::make_pair(temp_constant_name,temp_var3));
 
-                ir.add_ir(temp_constant_name+" :=#8"); //type double
-                ir.add_ir(temp_index_name+ " :="+ir.get_node_name(length_node)+" * "+temp_index_name);
+                ir.add_ir(temp_constant_name+"_int"+" :=#8"); //type double
+                ir.add_ir(temp_index_name+"_int"+ " :="+ir.get_node_name(length_node)+" * "+temp_constant_name+"_int");
             }
             //assign the value from an array
 
-            ir.add_ir(temp_name+" :=&"+ir.gen_array_name(new_array_node)+" + "+ir.get_node_name(length_node));
+            ir.add_ir(temp_name+"_"+new_array_node.type+" :=&"+ir.gen_array_name(new_array_node)+" + "+temp_index_name+"_int");
             return new_temp_var;
         }
         
@@ -1181,10 +1188,10 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
             var_node constant_var_node=this->create_temp_var(temp_constant_name,"int");
             block_stack.back().var_map.insert(std::make_pair(temp_constant_name,constant_var_node));
 
-            ir.add_ir(temp_constant_name+" := #1");
+            ir.add_ir(temp_constant_name+"_int"+" := #1");
 
-            ir.add_ir(temp_name=" :="+ir.get_node_name(current_node)); // the return value remains the value of vurrent var
-            ir.add_ir(ir.get_node_name(current_node)+" := "+ir.get_node_name(current_node)+" + "+temp_constant_name);
+            ir.add_ir(temp_name+"_int"=" :="+ir.get_node_name(current_node)); // the return value remains the value of vurrent var
+            ir.add_ir(ir.get_node_name(current_node)+" := "+ir.get_node_name(current_node)+" + "+temp_constant_name+"_int");
 
             return return_node;
         }
@@ -1205,10 +1212,10 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
             var_node constant_var_node=this->create_temp_var(temp_constant_name,"int");
             block_stack.back().var_map.insert(std::make_pair(temp_constant_name,constant_var_node));
 
-            ir.add_ir(temp_constant_name+" := #1");
+            ir.add_ir(temp_constant_name+"_int"+" := #1");
 
-            ir.add_ir(temp_name=" :="+ir.get_node_name(current_node)); // the return value remains the value of vurrent var
-            ir.add_ir(ir.get_node_name(current_node)+" := "+ir.get_node_name(current_node)+" - "+temp_constant_name);
+            ir.add_ir(temp_name+"_int"=" :="+ir.get_node_name(current_node)); // the return value remains the value of vurrent var
+            ir.add_ir(ir.get_node_name(current_node)+" := "+ir.get_node_name(current_node)+" - "+temp_constant_name+"_int");
 
             return return_node;
         }
@@ -1238,9 +1245,9 @@ var_node ir_gen::analyze_primary_expression(const std::shared_ptr<AST> & primary
         this->block_stack.back().var_map.insert(std::make_pair(temp_var_name,new_var_node));
 
         if(primary_exp->left_child->name=="TRUE")
-            ir.add_ir(temp_var_name+" := #1");
+            ir.add_ir(temp_var_name+"_int"+" := #1");
         else
-            ir.add_ir(temp_var_name+" := #0");
+            ir.add_ir(temp_var_name+"_int"+" := #0");
         return new_var_node;
 
 
@@ -1252,7 +1259,12 @@ var_node ir_gen::analyze_primary_expression(const std::shared_ptr<AST> & primary
         var_node new_var_node=create_temp_var(temp_var_name,"int");
         this->block_stack.back().var_map.insert(std::make_pair(temp_var_name,new_var_node));
 
-        ir.add_ir(temp_var_name+" := #"+ content); // we will distinguish int and float here later.
+        new_var_node.is_constant_int=true;
+
+        std::stringstream sstr(content);
+        sstr>>new_var_node.real_value;
+        
+        ir.add_ir(temp_var_name+"_int"+" := #"+ content); // we will distinguish int and float here later.
         return new_var_node;
     }
 
