@@ -981,7 +981,7 @@ var_node ir_gen::analyze_multiplicative_expression(const std::shared_ptr<AST> & 
         return analyze_unary_expression(unary_exp);
     }
     var_node operand1=analyze_multiplicative_expression(multiplicative_exp->left_child);
-    var_node operand2=analyze_unary_expression(multiplicative_exp->left_child->right_child->right_child);
+    var_node operand2=analyze_unary_expression(multiplicative_exp->left_child->right_child->right_child->left_child); //specially setting for the lack of cast
 
     if(operand1.type!=operand2.type)
     {
@@ -1209,7 +1209,7 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
 
         ir.add_ir(temp_constant_name+"_int"+" := #1");
 
-        ir.add_ir(temp_name+"_int"+" :="+ir.get_node_name(current_node)); // the return value remains the value of vurrent var
+        ir.add_ir(temp_name+"_int"+" := "+ir.get_node_name(current_node)); // the return value remains the value of vurrent var
         ir.add_ir(ir.get_node_name(current_node)+" := "+ir.get_node_name(current_node)+" + "+temp_constant_name+"_int");
 
         return return_node;
@@ -1233,7 +1233,7 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
 
         ir.add_ir(temp_constant_name+"_int"+" := #1");
 
-        ir.add_ir(temp_name+"_int"=" :="+ir.get_node_name(current_node)); // the return value remains the value of vurrent var
+        ir.add_ir(temp_name+"_int"+" := "+ir.get_node_name(current_node)); // the return value remains the value of vurrent var
         ir.add_ir(ir.get_node_name(current_node)+" := "+ir.get_node_name(current_node)+" - "+temp_constant_name+"_int");
 
         return return_node;

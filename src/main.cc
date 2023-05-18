@@ -61,7 +61,7 @@ int main(int argc,char* argv[])
     if(ir_gen_re)
         std::cout<<"ir success\n";
     else   
-        std::cout<<"ir success\n";
+        std::cout<<"ir not success\n";
 
     return 0;
 }
