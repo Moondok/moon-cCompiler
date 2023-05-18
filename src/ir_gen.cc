@@ -187,7 +187,7 @@ void ir_gen::analyze_iteration_statement(const std::shared_ptr<AST> & root)
 
             analyze_declaration(declaration);
 
-            ir.add_ir("GOTO "+label1+" :");
+            ir.add_ir(label1+" :");
 
             if(exp_statement->left_child->name=="expression")
             {
@@ -689,11 +689,18 @@ var_node ir_gen::analyze_assignment_expression(std::shared_ptr<AST> assign_exp)
                 ir.add_ir(ir.gen_binary_operation_ir(temp_name+"_"+tmp_node.type,left_node,right_node,"^"));
         }
     }
-    std::string new_code="var"+std::to_string(left_node.id)+"_"+left_node.type+" := ";
+    std::string new_code;
+    
+    if(left_node.is_addr)//specially set,for array
+        new_code=left_node.name+"_"+left_node.type+" := ";
+    else
+        new_code="var"+std::to_string(left_node.id)+"_"+left_node.type+" := ";
     if(tmp_node.id==-1)
         new_code+=tmp_node.name+"_"+tmp_node.type;
     else
         new_code+="var"+std::to_string(tmp_node.id)+"_"+tmp_node.type;
+
+    ir.add_ir(new_code);
     
     return left_node;
     
@@ -1116,8 +1123,8 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
             error_infos.emplace_back(error_info("undefined array "+array_name,postfix_exp->line,postfix_exp->col));
             return var_node();
         }
-        std::string temp_name="temp"+std::to_string(ir.num_temp);
-        var_node new_temp_var(temp_name,new_array_node.type,ir.num_temp++,true);
+        std::string temp_name="temp"+std::to_string(ir.num_temp++);
+        var_node new_temp_var(temp_name,new_array_node.type,-1,true);
         this->block_stack.back().var_map.insert(std::make_pair(temp_name,new_temp_var));
 
         if(new_array_node.type=="int"||new_array_node.type=="float"||new_array_node.type=="double")
@@ -1133,7 +1140,7 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
                 var_node temp_var3(temp_constant_name,"int");
                 block_stack.back().var_map.insert(std::make_pair(temp_constant_name,temp_var3));
 
-                ir.add_ir(temp_constant_name+"_int"+" :=#4");
+                ir.add_ir(temp_constant_name+"_int"+" := #4");
                 ir.add_ir(temp_index_name+"_int"+ " :="+ir.get_node_name(length_node)+" * "+temp_constant_name+"_int");
             }
 
@@ -1143,7 +1150,7 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
                 var_node temp_var3(temp_constant_name,"int");
                 this->block_stack.back().var_map.insert(std::make_pair(temp_constant_name,temp_var3));
 
-                ir.add_ir(temp_constant_name+"_int"+" :=#8"); //type double
+                ir.add_ir(temp_constant_name+"_int"+" := #8"); //type double
                 ir.add_ir(temp_index_name+"_int"+ " :="+ir.get_node_name(length_node)+" * "+temp_constant_name+"_int");
             }
             //assign the value from an array
