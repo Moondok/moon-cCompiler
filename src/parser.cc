@@ -832,7 +832,7 @@ int Parser::read_cache()
 		getline(f,tmp);
 		std::stringstream sstrem(tmp);
 		sstrem >> size;
-		std::cout << "size'" << size << "\n";
+		//std::cout << "size'" << size << "\n";
 		for (unsigned int i = 0; i < size; i++)
 		{
 			movement mov;
@@ -1028,13 +1028,19 @@ std::tuple<bool, std::string, int, int> Parser::check(const std::string path,std
 							if(i==0)
 							{
 								new_node->left_child=tmp;
+								// pass the line and columns back to the upper layer 
+								new_node->line=tmp->line;
+								new_node->col=tmp->col;
 								right_tmp=new_node->left_child;
+
 							}
 							else
 							{
 								right_tmp->right_child=tmp;
 								right_tmp=right_tmp->right_child;
 							}
+
+							
 						}
 						new_node->name=x.left.name;
 						if(n==1)
