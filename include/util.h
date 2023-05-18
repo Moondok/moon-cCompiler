@@ -15,6 +15,7 @@ bool isOct(char digit);
 bool isHex(char digit);
 bool isDelimiter(char ch);
 bool isOperator(char ch);
+void print_rule();
 
 
 void print_tree(const std::shared_ptr<AST> & root,std::ofstream & o,unsigned int layer);

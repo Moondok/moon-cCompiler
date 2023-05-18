@@ -102,6 +102,16 @@ bool isLetter(char letter)
  }
 
 
- 
+ void print_rule()
+ {
+    std::cout<<"mooncC takes four parameters, the format is \n";
+    std::cout<<"1: the path of the executable program";
+    std::cout<<"2: the source file you want to analyze";
+    std::cout<<"3: the type of object code '-m' stands for 'mips assembly' and '-l' stands for 'llvm ir' ";
+    std::cout<<"4: whether to dump grammer tree as json file (optional)";
+ }
+
  
 
+ 
+ 
