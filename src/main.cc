@@ -66,31 +66,36 @@ int main(int argc,char* argv[])
     auto r=parser.check("./token_result.tmp",root);
     //std::cout<<std::get<0>(r)<<' '<<std::get<1>(r);
     //std::cout<<std::get<2>(r)<<' '<<std::get<3>(r);
-    std::cout<<"moon-cC parser : syntax analysis done.             ++++####\n";
-    
-    if(is_dump_tree)
+    if(std::get<0>(r)==false)
+        std::cout<<"some errors occurs in syntax analyse.\n";
+    else
     {
-        std::ofstream o("tree.json");
-        print_tree(root,o,0);
+        std::cout<<"moon-cC parser : syntax analysis done.             ++++####\n";
+        
+        if(is_dump_tree)
+        {
+            std::ofstream o("tree.json");
+            print_tree(root,o,0);
+        }
+
+        //std::cout<<std::get<0>(r)<<' '<<std::get<1>(r);
+        //std::cout<<std::get<2>(r)<<' '<<std::get<3>(r);
+
+        ir_gen ir_generator;
+        if(root!=nullptr)
+            ir_generator.analyze_tree(root);
+
+        bool ir_gen_re=ir_generator.get_result();
+        
+
+        if(ir_gen_re)
+            std::cout<<"moon-cC IR generator : semantic analysis done.       ++######\n";
+        else   
+            std::cout<<"mooc-cC IR generator : some errors occur, see details in 'errors.log' .\n";
+
+
+        std::cout<<"moon-cC object code generator: object code done.   ########\n";
     }
-
-    //std::cout<<std::get<0>(r)<<' '<<std::get<1>(r);
-    //std::cout<<std::get<2>(r)<<' '<<std::get<3>(r);
-
-    ir_gen ir_generator;
-    if(root!=nullptr)
-        ir_generator.analyze_tree(root);
-
-    bool ir_gen_re=ir_generator.get_result();
-    std::cout<<"moon-cC IR generator : syntax analysis done.       ++######\n";
-
-    if(ir_gen_re)
-        std::cout<<"ir success\n";
-    else   
-        std::cout<<"ir not success\n";
-
-
-    std::cout<<"moon-cC object code generator: object code done.   ########\n";
 
     return 0;
 }

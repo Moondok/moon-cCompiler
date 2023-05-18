@@ -264,7 +264,10 @@ void ir_gen::analyze_jump_statement(const std::shared_ptr<AST> & root)
     {
         int block_id=this->get_break_block_id();
         if(block_id==-1)
+        {
             error_infos.emplace_back(error_info("can not break this scope.\n",root->line,root->col));
+            return ;
+        }
         ir.add_ir("GOTO "+block_stack[block_id].break_label);
     }
 
@@ -415,6 +418,7 @@ void ir_gen::analyze_function_definition(const std::shared_ptr<AST> &root)
     new_fun_block.is_func=true;
     new_fun_block.func.name=func_name;
     new_fun_block.func.rtype=rtype;
+    new_fun_block.func.is_defined=true;
 
     block_stack.emplace_back(new_fun_block);
     if(has_declaration==false)
@@ -500,7 +504,7 @@ void ir_gen::analyze_init_declarator(const std::shared_ptr<AST> & root, std::str
 
             }
             else
-                error_infos.emplace_back(error_info("multiple definitions for variable"+var_name+'\n',root->line,root->col));
+                error_infos.emplace_back(error_info("multiple definitions for variable "+var_name+'\n',root->line,root->col));
 
         }
 
@@ -1164,14 +1168,15 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
     else if (postfix_exp->left_child->right_child->name=="(")
     {
         std::string func_name=postfix_exp->left_child->left_child->left_child->content;
-        func_node func=func_pool[func_name];
+        
         
         var_node new_var_node; // restore the return value of a function call.
         if(func_pool.find(func_name)==func_pool.end())
         {
-            error_infos.emplace_back(error_info("undefined function "+func_name,postfix_exp->line,postfix_exp->col));
+            error_infos.emplace_back(error_info("undefined function "+func_name+"\n",postfix_exp->line,postfix_exp->col));
             return var_node();
         }
+        func_node func=func_pool[func_name];
 
         if(postfix_exp->left_child->right_child->right_child->name=="argument_expression_list")
         {
@@ -1328,6 +1333,12 @@ void ir_gen::analyze_argument_expression_list(const std::shared_ptr<AST> & node,
     if(error_infos.size())
         return;
     std::shared_ptr<AST> start=node->left_child;
+
+    // if(func_pool.find(func_name)==func_pool.end())
+    // {
+    //     error_infos.emplace_back(error_info("function "+func_name+" is not defined yet.\n",node->line,node->col));
+    //     return;
+    // }
     func_node func=this->func_pool[func_name];
     unsigned int cnt=0;
     //cuz we may have multiple arguments, so here we adopt a loop 
@@ -1341,7 +1352,7 @@ void ir_gen::analyze_argument_expression_list(const std::shared_ptr<AST> & node,
         cnt++;
         if(cnt>=func.para_list.size())
         {
-            error_infos.emplace_back(error_info("too many atguments passed to our function.\n",node->line,node->col));
+            error_infos.emplace_back(error_info("too many arguments passed to our function.\n",node->line,node->col));
             return;
         }
         if(func.para_list[func.para_list.size()-cnt].type!=new_arg_node.type)
@@ -1400,7 +1411,7 @@ var_node ir_gen::create_temp_var(std::string var_name,std::string var_type)
 
 int ir_gen::get_break_block_id()
 {
-    unsigned int n=this->block_stack.size();
+    int n=this->block_stack.size();
     for(auto i=n-1;i>=0;i--)
         if(block_stack.at(i).can_break)
             return i;
@@ -1424,8 +1435,11 @@ bool ir_gen::get_result()
         if(!f.is_open())
             std::cerr<<"can not create error log file.\n";
         else
+        {
+            f<<"SEMANTIC ERRORS:\n";
             for(const auto & error:error_infos)
-                f<<error.error_msg<<'\n';
+                f<<"some error occurs at line "<<error.line<<" column "<<error.col<<" : "<<error.error_msg;
+        }
 
         f.close();
         return false;
