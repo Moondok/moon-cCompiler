@@ -59,7 +59,7 @@ int main(int argc,char* argv[])
         }
     }
     
-    if(is_legal)
+    if(!is_legal)
     {
         std::cout<<"the parameters you input is illegal , the usage is as follow:\n";
         print_rule();
@@ -142,7 +142,7 @@ int main(int argc,char* argv[])
                 bool ir_gen_re=ir_generator.get_result();
                 if(ir_gen_re)
                 {
-                    std::cout<<"moon-cC IR generator : semantic analysis done.       ++######\n";
+                    std::cout<<"moon-cC IR generator : semantic analysis done.     ++######\n";
 
                     //add the object code generation
                     {
