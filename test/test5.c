@@ -13,9 +13,9 @@ int main()
 
     do //test do-while
     {
-        t+i;
+        t+i; //reduntant temp, will be dumped in our optimization 
         /* code */
-        i++;
+        i++; // the return value of i++ will be dumped then
     } while (i<3);
     
     return 0;

@@ -125,7 +125,7 @@ void ir_gen::analyze_iteration_statement(const std::shared_ptr<AST> & root)
 
             analyze_expression_statement(exp_statement1);
 
-            ir.add_ir(label1+" :");
+            ir.add_ir("LABEL "+label1+" :");
 
             if(exp_statement2->left_child->name=="expression")
             {
@@ -187,7 +187,7 @@ void ir_gen::analyze_iteration_statement(const std::shared_ptr<AST> & root)
 
             analyze_declaration(declaration);
 
-            ir.add_ir(label1+" :");
+            ir.add_ir("LABEL "+label1+" :");
 
             if(exp_statement->left_child->name=="expression")
             {
@@ -1190,7 +1190,7 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
         {
             std::string temp_name="temp"+std::to_string(ir.num_temp++);
             new_var_node=this->create_temp_var(temp_name,func.rtype);
-            ir.add_ir(temp_name+":= call "+func_name);
+            ir.add_ir(temp_name+"_"+func.rtype+" := call "+func_name);
         }
 
         return new_var_node;
@@ -1449,6 +1449,13 @@ bool ir_gen::get_result()
         ir.output_ir();
         return true;
     }
+}
+
+void ir_gen::optimize()
+{
+    // this structure 
+
+    std::map<std::string,unsigned int> temp2num; 
 }
 
 // output ir file or error file

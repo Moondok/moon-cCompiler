@@ -102,6 +102,8 @@ int get_break_block_id();
 
 std::string get_func_rtype();
 
+void optimize();// this function is to optimize ir
+
 bool get_result();
 
 ~ir_gen();
