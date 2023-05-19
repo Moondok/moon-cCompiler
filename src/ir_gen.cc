@@ -1446,6 +1446,7 @@ bool ir_gen::get_result()
     }
     else 
     {
+        optimize();
         ir.output_ir();
         return true;
     }
@@ -1455,7 +1456,59 @@ void ir_gen::optimize()
 {
     // this structure 
 
-    std::map<std::string,unsigned int> temp2num; 
+    struct temp_info
+    {
+        unsigned int line=0;
+        unsigned int num=0;
+    };
+
+    std::map<std::string,temp_info> temp2num; 
+
+    std::vector<std::string>new_ir_list;
+
+    
+    // pass through and check;
+    for(unsigned int i=0;i<ir.ir_list.size();i++)
+    {
+        std::string ir_code=ir.ir_list[i];
+        unsigned int pos=ir_code.find("temp");
+        while(pos!=-1)
+        {
+            unsigned int end=ir_code.find(" ",pos);
+            end=(end==-1)?ir_code.size():end;
+            std::string temp_name=ir_code.substr(pos,end-pos);
+
+            if(temp2num.find(temp_name)!=temp2num.end())
+                temp2num[temp_name].num++;
+            else
+            {
+                temp_info new_temp;
+                new_temp.num=1;
+                new_temp.line=i;
+                if(ir_code.find("call")!=-1)
+                    new_temp.num=100;
+                temp2num.insert(std::make_pair(temp_name,new_temp));
+
+            }
+            pos=end+1;
+            if(pos>=ir_code.size())
+                break;
+            pos=ir_code.find("temp",pos);
+        }
+    }
+
+    std::set<unsigned int> line_set;
+    for(auto & info:temp2num)
+        if(info.second.num==1)
+            line_set.insert(info.second.line);
+
+    for(unsigned int i=0;i<ir.ir_list.size();i++)
+        if(line_set.find(i)==line_set.end())
+            new_ir_list.emplace_back(ir.ir_list.at(i));
+    
+    ir.ir_list.assign(new_ir_list.begin(),new_ir_list.end());
+    //ir.output_ir();
+    
 }
 
 // output ir file or error file

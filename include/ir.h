@@ -10,10 +10,11 @@
 class IR
 {
 private:
-    std::vector<std::string> ir_list;
+    
 
 
 public:
+    std::vector<std::string> ir_list;
     unsigned int num_var=0;  //user defined variable
     unsigned int num_temp=0; //temp variable
     unsigned int num_arr=0;

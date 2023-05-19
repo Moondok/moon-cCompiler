@@ -10,6 +10,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <set>
 
 typedef std::tuple<bool, std::string , unsigned int ,unsigned int> return_msg;
 
