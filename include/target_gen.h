@@ -3,143 +3,22 @@
 #include <vector>
 #include <tuple>
 #include <iostream>
+#include <set>
+#include <iostream>
 typedef std::tuple<int,std::string , std::string, std::string ,std::string, std::string ,std::string >
  parse_return;
+
 
 class target_gen
 {
 private:
+    std::string file_name;
     std::vector<std::string> mips_list;
-    parse_return parse(std::string ir)
-    {
-        parse_return return_value;
-        int type=0;
-        std::string re1="";
-        std::string re2="";
-        std::string re3="";
-        std::string re4="";
-        std::string re5="";
-        std::string re6="";
+    std::set<int> basic_block_entries;
 
-        unsigned int start=0,end=0;
-        int cnt=0;
-        end=ir.find(" ",start);
-        while(end!=-1)
-        {
-            std::string re=ir.substr(start,end-start);
-            switch(cnt)
-            {
-                case 0:
-                {
-                    re1=std::get<1>(return_value)=re;
-                    break;
-                }
-                case 1:
-                {
-                    re2=std::get<2>(return_value)=re;
-                    break;
-                }
-                case 2:
-                {
-                    re3=std::get<3>(return_value)=re;
-                    break;
-                }
-                case 3:
-                {
-                    re4=std::get<4>(return_value)=re;
-                    break;
-                }
-                case 4:
-                {
-                    re5=std::get<5>(return_value)=re;
-                    break;
-                }
-                case 5:
-                {
-                    re6=std::get<6>(return_value)=re;
-                    break;
-                }
+    parse_return parse(std::string ir);
 
-            }
-            cnt++;
-            start=end+1;
-            if(start>=ir.size())
-                break;
-            end=ir.find(" ",start);
-        }
-
-        // add the last token
-        if(cnt==1)
-        {
-            re2=std::get<2>(return_value)=ir.substr(start,ir.size()+1-start);
-            cnt++;
-        }
-        else if(cnt==2)
-        {
-            re3=std::get<3>(return_value)=ir.substr(start,ir.size()+1-start);
-            cnt++;
-        }
-        else if(cnt==3)
-        {
-            re4=std::get<4>(return_value)=ir.substr(start,ir.size()+1-start);
-            cnt++;
-        }
-        else if(cnt==4)
-        {
-            re5=std::get<5>(return_value)=ir.substr(start,ir.size()+1-start);
-            cnt++;
-        }
-        else if(cnt==5)
-        {
-            re6=std::get<6>(return_value)=ir.substr(start,ir.size()+1-start);
-            cnt++;
-        }
-
-
-
-
-        if(cnt==3) // 3 components
-        {
-            if(re1=="FUNCTION")
-                std::get<0>(return_value)=0;
-            else if(re1=="ARRAY")
-                std::get<0>(return_value)=4;
-            else if(re1=="LABEL")
-                std::get<0>(return_value)=9;
-            else if(re3[0]=='#')
-                std::get<0>(return_value)=5;
-            else 
-                std::get<0>(return_value)=6;
-
-        }
-        else if(cnt==2)
-        {
-            if(re1=="param")
-                std::get<0>(return_value)=1;
-            else if(re1=="RETURN")
-                std::get<0>(return_value)=3;
-            else if(re1=="arg")
-                std::get<0>(return_value)=7;
-            else if(re1=="GOTO")
-                std::get<0>(return_value)=11;
-        }
-        else if(cnt==4)
-            std::get<0>(return_value)=8;
-        else if(cnt==5)
-        {
-            if(re3[0]=='&')// array 
-                std::get<0>(return_value)=12;
-            else
-                std::get<0>(return_value)=2;
-        }
-        else if(cnt==6)
-            std::get<0>(return_value)=10;
-
-        return return_value;
-
-        
-
-    }
+    void get_block_entries();
     //type 
     //0:3 FUNCTION funcname :   ok
     //1:2 param name     ok
@@ -157,9 +36,14 @@ private:
     // total 13 types of IR
 
 public:
-    void print_parse_result(std::string file_name)
+
+    target_gen(const std::string &f_n):file_name(f_n){};
+
+    target_gen():file_name("ir.mcc"){};
+
+    void print_parse_result()
     {
-        std::ifstream infile(file_name);
+        std::ifstream infile(this->file_name);
         std::string ir;
 
         std::ofstream ofile("test.txt");
@@ -189,6 +73,8 @@ public:
         }
         infile.close();
         ofile.close();
+
+        get_block_entries();
     }
 
 
