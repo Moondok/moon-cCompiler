@@ -29,9 +29,11 @@ void ir_gen::analyze_iteration_statement(const std::shared_ptr<AST> & root)
 {
     if(root->left_child->name=="WHILE")
     {
-        Block new_block;
+        Block new_block(ir.num_block++); //5-26
         new_block.can_break=true;
         block_stack.emplace_back(new_block);
+
+        ir.add_ir("BEGIN LOOP"); //5-26
 
         std::shared_ptr<AST> expression=root->left_child->right_child->right_child;
         std::shared_ptr<AST> statement=expression->right_child->right_child;
@@ -65,13 +67,16 @@ void ir_gen::analyze_iteration_statement(const std::shared_ptr<AST> & root)
         ir.add_ir("GOTO "+label1);// go to judge
         ir.add_ir("LABEL "+label3+" :"); // end 
 
+        block_stack.back().dump_block(ofile);
         block_stack.pop_back();
+
+        ir.add_ir("END LOOP");//5-26
 
     }
 
     else if(root->left_child->name=="DO")
     {
-        Block new_block;
+        Block new_block(ir.num_block++);//5-26
         new_block.can_break=true;
         block_stack.emplace_back(new_block);
 
@@ -82,6 +87,8 @@ void ir_gen::analyze_iteration_statement(const std::shared_ptr<AST> & root)
         std::string label2=ir.gen_label_name();
 
         block_stack.back().break_label=label2;
+
+        ir.add_ir("BEGIN LOOP");//5-26
 
         //label1 is the beginning , consistency for continue
         ir.add_ir("LABEL "+label1+" :");
@@ -101,7 +108,11 @@ void ir_gen::analyze_iteration_statement(const std::shared_ptr<AST> & root)
 
         }
         ir.add_ir("LABEL "+label2+ " :");
+
+        block_stack.back().dump_block(ofile);
         block_stack.pop_back();
+
+        ir.add_ir("END LOOP");//5-26
     }
 
     else if(root->left_child->name=="FOR")
@@ -109,7 +120,7 @@ void ir_gen::analyze_iteration_statement(const std::shared_ptr<AST> & root)
         if(root->left_child->right_child->right_child->name=="expression_statement")
         {
             
-            Block new_block;
+            Block new_block(ir.num_block++);//5-26
             new_block.can_break=true;
             block_stack.emplace_back(new_block);
 
@@ -123,6 +134,7 @@ void ir_gen::analyze_iteration_statement(const std::shared_ptr<AST> & root)
             block_stack.back().break_label=label3;
             block_stack.back().start_label=label1;
 
+            ir.add_ir("BEGIN LOOP");// we start the loop begin the initialization, which makes sense 5-26
             analyze_expression_statement(exp_statement1);
 
             ir.add_ir("LABEL "+label1+" :");
@@ -166,12 +178,15 @@ void ir_gen::analyze_iteration_statement(const std::shared_ptr<AST> & root)
             ir.add_ir("GOTO "+label1);
             ir.add_ir("LABEL "+label3+ " :");
 
+            ir.add_ir("END LOOP");
+
+            block_stack.back().dump_block(ofile);
             block_stack.pop_back();
             
         }
         else //start with declaration
         {
-            Block new_block;
+            Block new_block(ir.num_block++);
             new_block.can_break=true;
             block_stack.emplace_back(new_block);
 
@@ -185,6 +200,7 @@ void ir_gen::analyze_iteration_statement(const std::shared_ptr<AST> & root)
             block_stack.back().break_label=label3;
             block_stack.back().start_label=label1;
 
+            ir.add_ir("BEGIN LOOP");
             analyze_declaration(declaration);
 
             ir.add_ir("LABEL "+label1+" :");
@@ -227,7 +243,8 @@ void ir_gen::analyze_iteration_statement(const std::shared_ptr<AST> & root)
 
             ir.add_ir("GOTO "+label1);
             ir.add_ir("LABEL "+label3+ " :");
-
+            ir.add_ir("END LOOP");
+            block_stack.back().dump_block(ofile);
             block_stack.pop_back();
         }
          
@@ -308,8 +325,10 @@ void ir_gen::analyze_selection_statement(const std::shared_ptr<AST> & root)
     // no else
     if(root->left_child->right_child->right_child->right_child->right_child->right_child==nullptr)
     {
-        Block new_block;
+        Block new_block(ir.num_block++);
         block_stack.emplace_back(new_block);
+
+        ir.add_ir("BEGIN IF");//5-26
 
         std::shared_ptr<AST> exp=root->left_child->right_child->right_child;
         var_node condition_var=analyze_expression(exp);
@@ -333,12 +352,17 @@ void ir_gen::analyze_selection_statement(const std::shared_ptr<AST> & root)
 
         analyze_statement(statement);
         ir.add_ir("LABEL "+label2+" :");
+        block_stack.back().dump_block(ofile);
         block_stack.pop_back();
+
+        ir.add_ir("END IF");//5-26
     }
     else // there is else
     {
-        Block newblock1;
+        Block newblock1(ir.num_block++);
         block_stack.emplace_back(newblock1);
+
+        ir.add_ir("BEGIN IF");
 
         std::shared_ptr<AST> exp=root->left_child->right_child->right_child;
 
@@ -366,16 +390,22 @@ void ir_gen::analyze_selection_statement(const std::shared_ptr<AST> & root)
         analyze_statement(statement1);
 
         ir.add_ir("GOTO "+label3);// for 'if'
+        block_stack.back().dump_block(ofile);
         block_stack.pop_back();
+        ir.add_ir("END IF"); //5-26
+
 
         ir.add_ir("LABEL "+label2+" :"); //for 'else'
+        ir.add_ir("BEGIN ELSE"); //5-26
 
-        Block newblock2;
+        Block newblock2(ir.num_block++);
         block_stack.emplace_back(newblock2);
 
         analyze_statement(statement2);
         ir.add_ir("LABEL "+label3+" :");
+        block_stack.back().dump_block(ofile);
         block_stack.pop_back();
+        ir.add_ir("END ELSE");
 
     }
 
@@ -414,7 +444,7 @@ void ir_gen::analyze_function_definition(const std::shared_ptr<AST> &root)
         }
 
     }
-    Block new_fun_block;
+    Block new_fun_block(ir.num_block++);//5-26
     new_fun_block.is_func=true;
     new_fun_block.func.name=func_name;
     new_fun_block.func.rtype=rtype;
@@ -447,7 +477,7 @@ void ir_gen::analyze_function_definition(const std::shared_ptr<AST> &root)
     new_fun_block.func=func;
 
     analyze_compound_statement(compound_statement);
-
+    block_stack.back().dump_block(ofile);
     block_stack.pop_back();
 }
 
@@ -501,6 +531,9 @@ void ir_gen::analyze_init_declarator(const std::shared_ptr<AST> & root, std::str
                 new_var.type=var_type;
                 new_var.id=this->ir.num_var++;
                 this->block_stack.back().var_map.insert(std::make_pair(var_name,new_var));
+                this->block_stack.back().var2memory_location.insert(std::make_pair(new_var,this->block_stack.back().block_size));//5-26
+                this->block_stack.back().block_size+=4;// no matter what type the variable is, the memory takes is 4
+
 
             }
             else
@@ -553,9 +586,11 @@ void ir_gen::analyze_init_declarator(const std::shared_ptr<AST> & root, std::str
                     return ;
                 }
                 // for the array's size is an constant ,i do not plan to add perform a calculate ir here.
-                array_node new_array_node(arr_name,arr_type,ir.num_arr++); // to be done: add the representation of capacity.
+                array_node new_array_node(arr_name,arr_type,ir.num_arr++,rnode.real_value); // to be done: add the representation of capacity.
                 ir.add_ir("ARRAY "+ir.gen_array_name(new_array_node)+" "+std::to_string(rnode.real_value));//to be done: here rnode.name is just a placeholder, we need a string representing capacity here!!!
                 block_stack.back().arr_map.insert(std::make_pair(arr_name,new_array_node));
+                block_stack.back().arr2memory_location.insert(std::make_pair(new_array_node,block_stack.back().block_size));
+                block_stack.back().block_size+=4*rnode.real_value; //memory space for arrays
             }
         }
     }
@@ -572,6 +607,8 @@ void ir_gen::analyze_init_declarator(const std::shared_ptr<AST> & root, std::str
                 new_var_node.type=var_type;
                 new_var_node.id=ir.num_var++;
                 this->block_stack.back().var_map.insert(std::make_pair(new_var_name,new_var_node));
+                this->block_stack.back().var2memory_location.insert(std::make_pair(new_var_node,this->block_stack.back().block_size));//5-26
+                this->block_stack.back().block_size+=4;// no matter what type the variable is, the memory takes is 4
             }
             else
                 error_infos.emplace_back(error_info("multiple definitions for variable "+new_var_name+".\n",root->line,root->col));
@@ -1145,7 +1182,7 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
                 block_stack.back().var_map.insert(std::make_pair(temp_constant_name,temp_var3));
 
                 ir.add_ir(temp_constant_name+"_int"+" := #4");
-                ir.add_ir(temp_index_name+"_int"+ " :="+ir.get_node_name(length_node)+" * "+temp_constant_name+"_int");
+                ir.add_ir(temp_index_name+"_int"+ " := "+ir.get_node_name(length_node)+" * "+temp_constant_name+"_int");
             }
 
             else if(new_array_node.type=="double")
@@ -1155,11 +1192,11 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
                 this->block_stack.back().var_map.insert(std::make_pair(temp_constant_name,temp_var3));
 
                 ir.add_ir(temp_constant_name+"_int"+" := #8"); //type double
-                ir.add_ir(temp_index_name+"_int"+ " :="+ir.get_node_name(length_node)+" * "+temp_constant_name+"_int");
+                ir.add_ir(temp_index_name+"_int"+ " := "+ir.get_node_name(length_node)+" * "+temp_constant_name+"_int");
             }
             //assign the value from an array
 
-            ir.add_ir(temp_name+"_"+new_array_node.type+" :=&"+ir.gen_array_name(new_array_node)+" + "+temp_index_name+"_int");
+            ir.add_ir(temp_name+"_"+new_array_node.type+" := &"+ir.gen_array_name(new_array_node)+" + "+temp_index_name+"_int");
             return new_temp_var;
         }
     }
@@ -1513,4 +1550,6 @@ void ir_gen::optimize()
 
 // output ir file or error file
 ir_gen:: ~ir_gen()
-{}
+{
+    ofile.close();
+}

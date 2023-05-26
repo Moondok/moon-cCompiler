@@ -19,6 +19,7 @@ public:
     unsigned int num_temp=0; //temp variable
     unsigned int num_arr=0;
     unsigned int num_label=0;
+    int num_block=0;
 
     std::string gen_binary_operation_ir(std::string result,var_node a,var_node b,std::string op);
     std::string gen_parameter_ir(var_node node);

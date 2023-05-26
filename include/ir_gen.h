@@ -18,10 +18,14 @@ class ir_gen
 {
 public:
 std::vector<Block> block_stack;
+std::fstream ofile;
 
 IR ir;
 
-ir_gen(){};
+ir_gen()
+{
+    ofile.open("block_table_cache",std::ios::out);
+};
 
 struct error_info
 {
