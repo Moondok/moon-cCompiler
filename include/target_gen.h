@@ -113,7 +113,7 @@ public:
 
     void parse_sym_tbl()
     {
-        std::fstream tbl_file("block_table_cache",std::ios::in);
+        std::fstream tbl_file("block_table_cache1",std::ios::in);
         if(tbl_file.is_open()==false)
         {
             std::cerr<<"can not load symbol table.\n";
@@ -139,7 +139,7 @@ public:
                 {
                     block2vars.emplace_back(std::vector<var_info>());
                 }
-                while(block_id>block2size.size())
+                while(block_id>=block2size.size())
                     block2size.emplace_back(0);
 
                 block2size.at(block_id)=block_size;
@@ -202,7 +202,7 @@ public:
             }
         }
         
-
+        tbl_file.close();
 
     }
 public:
