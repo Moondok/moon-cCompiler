@@ -5,6 +5,8 @@
 #include <iostream>
 #include <set>
 #include <iostream>
+#include <map>
+#include <stack>
 typedef std::tuple<int,std::string , std::string, std::string ,std::string, std::string ,std::string >
  parse_return;
 
@@ -12,11 +14,31 @@ typedef std::tuple<int,std::string , std::string, std::string ,std::string, std:
 class target_gen
 {
 private:
+    struct var_info
+    {
+        int is_arr=0;
+        int length=0; // specially for array
+        int offset=0;
+        int id=-1; 
+        //note that the array and variable have different id systems 
+        var_info(int is_,int l,int o,int i):is_arr(is_),length(l),offset(o),id(i){};
+        var_info(){};
+    };
+    
     std::string file_name;
     std::vector<std::string> mips_list;
     std::set<int> basic_block_entries;
 
     parse_return parse(std::string ir);
+
+    // a map which map the block to a vector , the content in the vector is the struct info which contanins variable and offsets
+    std::vector<std::vector<var_info>> block2vars;
+
+    // a map which maps the block to its size;
+    std::vector<int> block2size;
+
+    // a stack which records the nesting relationship of blocks
+    std::stack<int> block_stack;
 
     void get_block_entries();
     //type 
@@ -43,9 +65,15 @@ private:
 
 public:
 
-    target_gen(const std::string &f_n):file_name(f_n){};
+    target_gen(const std::string &f_n):file_name(f_n)
+    {
+        parse_sym_tbl();
+    };
 
-    target_gen():file_name("ir.mcc"){};
+    target_gen():file_name("ir.mcc")
+    {
+        parse_sym_tbl();
+    };
 
     void print_parse_result()
     {
@@ -83,7 +111,100 @@ public:
         get_block_entries();
     }
 
+    void parse_sym_tbl()
+    {
+        std::fstream tbl_file("block_table_cache",std::ios::in);
+        if(tbl_file.is_open()==false)
+        {
+            std::cerr<<"can not load symbol table.\n";
+            return ;
+        }
+        std::string tmp;
+        while(getline(tbl_file,tmp))
+        {
+            int start=0;
+            int end=tmp.find(" ");
+            std::string token=tmp.substr(start,end-start);
+            if(token=="BLOCK") // a new block
+            {
+                start=end+1;
+                end=tmp.find(" ",start);
+                int block_id=stoi(tmp.substr(start,end-start));
 
+                start=end+1;
+                end=tmp.find(" ",start);
+                int block_size=stoi(tmp.substr(start,end-start));
+
+                while(block_id>=block2vars.size())
+                {
+                    block2vars.emplace_back(std::vector<var_info>());
+                }
+                while(block_id>block2size.size())
+                    block2size.emplace_back(0);
+
+                block2size.at(block_id)=block_size;
+
+                bool read_var=true;
+                while(true)
+                {
+                    getline(tbl_file,tmp);
+                    start=0;
+                    end=tmp.find(" ",start);
+                    std::string token=tmp.substr(start,end-start);
+                    if(token=="END")
+                        break; // end a block
+                    else
+                    {
+                        if(token=="VAR")
+                            continue;
+                        else if(token=="ARR")
+                        {
+                            read_var=false;
+                            continue;
+                        }
+                        else // a var of an array
+                        {
+                            int id=stoi(token);
+                            start=end+1;
+                            end=tmp.find(" ",start); //cuz type can be read directly from ir , we do not record here.
+                            start=end+1;
+                            end=tmp.find(" ",start);
+                            if(read_var) //
+                            {
+                                int offset=stoi(tmp.substr(start,end-start));
+                                block2vars.at(block_id).emplace_back(var_info(0,0,offset,id));
+
+                            }
+                            else
+                            {
+                                int length=stoi(tmp.substr(start,end-start));
+                                start=end+1;
+                                end=tmp.find(" ",start);
+                                int offset=stoi(tmp.substr(start,end-start));
+                                block2vars.at(block_id).emplace_back(var_info(1,length,offset,id));
+
+                            }
+
+                        }
+                    }
+                }
+
+
+            }
+
+
+            else if(token=="NUM")
+            {
+                start=end+1;
+                end=tmp.find(" ",start);
+                int num_block=stoi(tmp.substr(start,end-start));
+                break;
+            }
+        }
+        
+
+
+    }
 public:
 
     

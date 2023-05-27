@@ -1551,5 +1551,6 @@ void ir_gen::optimize()
 // output ir file or error file
 ir_gen:: ~ir_gen()
 {
+    ofile<<"NUM "<<ir.num_block<<" "<<'\n';
     ofile.close();
 }

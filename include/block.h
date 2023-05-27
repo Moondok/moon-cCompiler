@@ -72,8 +72,8 @@ public:
 
     void dump_block(std::fstream & ofile)
     {
-        ofile<<"BLOCK "<<this->id<<'\n';
-        ofile<<"VAR\n";
+        ofile<<"BLOCK "<<this->id<<" "<<this->block_size<<" "<<'\n';
+        ofile<<"VAR \n";
         for(auto & var : var2memory_location)
         {
             //ofile<<1;
@@ -83,11 +83,12 @@ public:
             // thus we can find the real name from the format like 'varx'
             ofile<<var.first.id<<" "<<var.first.type<<" "<<var.second<<" \n";
         }
-        ofile<<"ARR\n";
+        ofile<<"ARR \n";
         for(auto & arr:arr2memory_location)
         {
             ofile<<arr.first.id<<" "<<arr.first.type<<" "<<arr.first.num<<" "<<arr.second<<" \n";// note that the first.num is the capacity of array
         }
+        ofile<<"END BLOCK \n";
     }
 
 };
