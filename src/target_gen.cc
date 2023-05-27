@@ -315,7 +315,7 @@ void target_gen::analyze_ir()
         if(std::get<0>(r)==0) //function call
         {
             //notice that the params passed to current function are prepared, so there is no need to allocate memory for them
-            block_stack.push(this->num_block++);
+            block_stack.emplace_back(this->num_block++);
             //restore the 
             target_code_list.emplace_back(std::get<1>(r)+" :");
             target_code_list.emplace_back("addi $sp $sp -8");
@@ -336,6 +336,17 @@ void target_gen::analyze_ir()
             
         }
 
+        else if(std::get<0>(r)==3)
+        {
+            if(var2reg.find(std::get<2>(r))!=var2reg.end())
+             // if the return value already in register, no need to visit memory
+            {
+                
+            }
+
+
+        }
+
         else if(std::get<0>(r)==9)
         {
             std::string labelname=std::get<1>(r);
@@ -349,53 +360,42 @@ void target_gen::analyze_ir()
         }
         else if(std::get<0>(r)==13) //begin a loop!
         {
-            block_stack.push(this->num_block++);
+            block_stack.emplace_back(this->num_block++);
             int size=block2size.at(this->num_block-1);
             target_code_list.emplace_back("add $sp $sp -"+std::to_string(size));
         }
         else if(std::get<0>(r)==14)//end a loop
         {
-            int id=block_stack.top();
+            int id=block_stack.back();
             int size=block2size.at(id);
             target_code_list.emplace_back("add $sp $sp "+std::to_string(size));//recycle the memory
         }
         else if(std::get<0>(r)==15) //begin if!
         {
-            block_stack.push(this->num_block++);
+            block_stack.emplace_back(this->num_block++);
             int size=block2size.at(this->num_block-1);
             target_code_list.emplace_back("add $sp $sp -"+std::to_string(size));
         }
         else if(std::get<0>(r)==16)//end if
         {
-            int id=block_stack.top();
+            int id=block_stack.back();
             int size=block2size.at(id);
             target_code_list.emplace_back("add $sp $sp "+std::to_string(size));//recycle the memory
         }
         else if(std::get<0>(r)==17) //begin else!
         {
-            block_stack.push(this->num_block++);
+            block_stack.emplace_back(this->num_block++);
             int size=block2size.at(this->num_block-1);
             target_code_list.emplace_back("add $sp $sp -"+std::to_string(size));
         }
         else if(std::get<0>(r)==18)//end else
         {
-            int id=block_stack.top();
+            int id=block_stack.back();
             int size=block2size.at(id);
             target_code_list.emplace_back("add $sp $sp "+std::to_string(size));//recycle the memory
         }
 
     }
-
-
-
-    
-
-
-
-
-
-
-
 
     ir_file.close();
     
@@ -416,4 +416,71 @@ void target_gen::output_target()
 
 
     target_code_file.close();
+}
+
+int target_gen::get_index(std::string var_name)
+{
+    //note that the var_name can be temp or user-defined var , if var_name is user-defined , return value will be the 
+    // positive offset from $sp, else ,the return value will be a register index;
+
+    int i=0,id;
+    if(var_name[var_name.size()-1]=='t')
+    {
+        while(var_name.at(var_name.size()-5-i)<'9'&&var_name.at(var_name.size()-5-i)>'0')
+            i++;
+        id=stoi(var_name.substr(var_name.size()-5-i,i));
+    }
+    else
+    {
+        while(var_name.at(var_name.size()-8-i)<'9'&&var_name.at(var_name.size()-8-i)>'0')
+            i++;
+        id=stoi(var_name.substr(var_name.size()-8-i,i));
+    }
+
+    if(var_name[0]=='v'||var_name[0]=='a')//var or array;
+    {
+        
+        bool tag=false;
+        int offset;
+        for(int j=block_stack.size()-1;j>=0;j--)
+        {
+            for(auto & var:block2vars.at(block_stack.at(j)))// note thatblock_stack.at(j) is the id of a block
+            {
+
+                if(var.id==id&&((var.is_arr==0&&var_name[0]=='v')||(var.is_arr==1&&var_name[0]=='a'))) 
+                {
+                    offset+=block2size.at(block_stack.at(j))-var.offset;  // we trace the offset inversely!
+                    tag=true;
+                    break;
+                }
+            }
+
+            if(tag)
+                break;
+            else
+                offset+=block2size.at(block_stack.at(j));// more outer block( the id number is smaller)
+        }
+        return offset;
+    }
+
+    else if(var_name[0]=='t')//temp
+    {
+        int register_id;
+        if(var2reg.find(var_name)==var2reg.end()) // not find
+        {
+            register_id=get_register();
+            var2reg.insert(std::make_pair(var_name,register_id));
+            reg2vars.at(register_id).insert(var_name);
+        }
+        else
+            register_id=var2reg[var_name];
+        return register_id;
+    }
+
+    
+}
+
+void target_gen:: refresh_register()
+{
+
 }

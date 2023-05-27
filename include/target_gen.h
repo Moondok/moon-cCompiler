@@ -7,6 +7,7 @@
 #include <iostream>
 #include <map>
 #include <stack>
+#include <set>
 typedef std::tuple<int,std::string , std::string, std::string ,std::string, std::string ,std::string >
  parse_return;
 
@@ -38,10 +39,14 @@ private:
     std::vector<int> block2size;
 
     // a stack which records the nesting relationship of blocks
-    std::stack<int> block_stack;
+    std::vector<int> block_stack;
 
     // a map which maps the vars to register (may be not exists)
     std::map<std::string , int> var2reg;
+
+    // a map which maps the register to vars it restores
+    std::vector<std::set<std::string>> reg2vars=std::vector<std::set<std::string>>(32);//first 16 means the number register (t0-t7 s0-s7),second 16 for float f1-f16
+
 
     int num_block=0; //record the nesting relationships
 
@@ -49,25 +54,25 @@ private:
 
     void get_block_entries();
     //type 
-    //0:3 FUNCTION funcname :   ok
+    //0:3 FUNCTION funcname :   ok        done
     //1:2 param name     ok
     //2:5 x := x1 op x2
-    //3:2 RETURN x     ok
-    //4:3 ARRAY array_name length   ok
-    //5:3 x := #y   ok
-    //6:3 x := y    ok
+    //3:2 RETURN x     ok                pending
+    //4:3 ARRAY array_name length   ok   // no need to gen target code ( already in syb tbl)
+    //5:3 x := #y   ok                   pending
+    //6:3 x := y    ok                   pending
     //7:2 arg x     ok
-    //8:4 := call func    ok
-    //9:3 Label labelname :    ok
+    //8:4 := call func    ok             pending
+    //9:3 Label labelname :    ok          done
     //10:6 if x1 op x2 goto label
-    //11:2 GOTO label              ok
-    //12:5 x := &arr_name + index  ok
-    //13:2 BEGIN LOOP
-    //14:2 END LOOP
-    //15:2 BEGIN IF
-    //16:2 END IF
-    //17:2 BEGIN ELSE
-    //18:2 END ELSE
+    //11:2 GOTO label              ok      done
+    //12:5 x := &arr_name + index  ok    pending
+    //13:2 BEGIN LOOP                      done
+    //14:2 END LOOP                        done
+    //15:2 BEGIN IF                        done
+    //16:2 END IF                          done
+    //17:2 BEGIN ELSE                      done
+    //18:2 END ELSE                        done
     // total 19 types of IR
 
 public:
@@ -120,6 +125,10 @@ public:
     }
 
     int get_register();
+
+    int get_index(std::string var_name);
+
+    void refresh_register();
 
     void parse_sym_tbl();
 
