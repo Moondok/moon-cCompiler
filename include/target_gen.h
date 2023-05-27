@@ -60,9 +60,9 @@ private:
     //3:2 RETURN x     ok                 done
     //4:3 ARRAY array_name length   ok   // no need to gen target code ( already in syb tbl)
     //5:3 x := #y   ok                    done
-    //6:3 x := y    ok                   pending
+    //6:3 x := y    ok                    done
     //7:2 arg x     ok
-    //8:4 := call func    ok             pending
+    //8:4 := call func    ok               done
     //9:3 Label labelname :    ok          done
     //10:6 if x1 op x2 goto label
     //11:2 GOTO label              ok      done

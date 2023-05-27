@@ -363,37 +363,171 @@ void target_gen::analyze_ir()
                 else
                     target_code_list.emplace_back("lw $v0 "+std::to_string(offset)+"(sp)");
             }
+
+            // restore the scene, when this function is invoked.
+            int block_id=block_stack.back();
+            int size=block2size[block_id];
+
+            target_code_list.emplace_back("addi $sp $sp "+std::to_string(size));
+            //fp and ra!
+            target_code_list.emplace_back("lw $fp 4($sp)");
+            target_code_list.emplace_back("lw $ra 4($sp)");
+            // free the memory occupied by ra and fp
+            target_code_list.emplace_back("addi $sp 8");
+
         }
 
-        else if(std::get<0>(r)==5)
+        else if(std::get<0>(r)==5)//x := #y
         {
             std::string imm_num=std::get<2>(r).substr(1);
             std::string var_name=std::get<1>(r);
 
-            int reg_id=get_register(var_name);
+            int reg_id=get_register(var_name); 
             std::string reg_name=reg_index2name (reg_id);
-            var2reg.insert(std::make_pair(var_name,reg_id));
 
-            reg2vars.at(reg_id).insert(var_name);
+            if(var_name[0]=='t')// only register register relationship for temp!
+            {
+                var2reg.insert(std::make_pair(var_name,reg_id));
+                reg2vars.at(reg_id).insert(var_name);
+            }
 
             if(var_name[var_name.size()-1]=='t')//int
                 target_code_list.emplace_back("li "+reg_name+" "+imm_num);
             else
                 target_code_list.emplace_back("li.s "+reg_name+" "+imm_num);
             
-            if(var_name[0]=='v')// user-defined variable
+            if(var_name[0]=='v')// user-defined variable , do not need to load into reg
             {
                 int offset=get_index(var_name);
                 if(var_name[var_name.size()-1]=='t')//int
                 {
-                    target_code_list.emplace_back("sw "+reg_name+" "+std::to_string(offset)+"(sp)");
+                    target_code_list.emplace_back("sw "+reg_name+" "+std::to_string(offset)+"($sp)");
                 }
                 else 
                 { 
-                    target_code_list.emplace_back("s.s "+reg_name+" "+std::to_string(offset)+"(sp)");
+                    target_code_list.emplace_back("s.s "+reg_name+" "+std::to_string(offset)+"($sp)");
                 }
 
             }
+        }
+
+        else if(std::get<0>(r)==6) //x := y
+        {
+            std::string right_value=std::get<2>(r);
+            std::string left_value=std::get<1>(r);
+            if(var2reg.find(right_value)!=var2reg.end()) // we have it in register ,y is temp
+            {
+                int reg_id=var2reg[right_value];
+                std::string reg_name=reg_index2name (reg_id);
+                if(left_value[0]=='v')
+                {
+                    int offset=get_index(left_value);
+                    if(left_value[left_value.size()-1]=='t')
+                        target_code_list.emplace_back("sw "+reg_name+" "+std::to_string(offset)+"($sp)");
+                    else 
+                        target_code_list.emplace_back("s.s "+reg_name+" "+std::to_string(offset)+"($sp)");
+                }
+                else // x=tmp
+                {
+                    int left_reg_id=get_register(left_value);
+                    std::string left_reg_name=reg_index2name(left_reg_id);
+                    if(left_value[left_value.size()-1]=='t')
+                        target_code_list.emplace_back("move "+left_reg_name+" "+reg_name);
+                    else 
+                        target_code_list.emplace_back("mov.s "+left_reg_name+" "+reg_name);
+
+                    var2reg.insert(std::make_pair(left_value,left_reg_id));  //new temp ,register
+                    reg2vars.at(left_reg_id).insert(left_value);
+
+
+                }
+
+                // now y is used ,delete its info!
+                auto ite=var2reg.find(right_value);
+                var2reg.erase(ite);
+
+                reg2vars.at(reg_id).clear();
+
+            }
+            else //y is a user-defined var
+            {
+                int reg_id=get_register(right_value);
+                std::string reg_name=reg_index2name (reg_id);
+                int offset=get_index(right_value);  //offset of y
+
+                // load y into register first
+                if(right_value[right_value.size()-1]=='t')//int
+                    target_code_list.emplace_back("lw "+reg_name+" "+std::to_string(offset)+"(sp)");
+                else
+                    target_code_list.emplace_back("l.s "+reg_name+" "+std::to_string(offset)+"(sp)");
+
+                    
+
+                if(left_value[0]=='v')
+                {
+                    int offset=get_index(left_value);
+                    if(left_value[left_value.size()-1]=='t')
+                        target_code_list.emplace_back("sw "+reg_name+" "+std::to_string(offset)+"(sp)");
+                    else 
+                        target_code_list.emplace_back("s.s "+reg_name+" "+std::to_string(offset)+"(sp)");
+                }
+                else // x=tmp
+                {
+                    int left_reg_id=get_register(left_value);
+                    std::string left_reg_name=reg_index2name(left_reg_id);
+                    if(left_value[left_value.size()-1]=='t')
+                        target_code_list.emplace_back("move "+left_reg_name+" "+reg_name);
+                    else 
+                        target_code_list.emplace_back("mov.s "+left_reg_name+" "+reg_name);
+
+                    var2reg.insert(std::make_pair(left_value,left_reg_id));  //new temp ,register
+                    reg2vars.at(left_reg_id).insert(left_value);
+                }
+            }
+
+            
+        }
+
+        else if(std::get<0>(r)==8) //x=call func
+        {
+            target_code_list.emplace_back("addi $sp $sp -8");
+            target_code_list.emplace_back("sw $ra 8($sp)");
+            target_code_list.emplace_back("sw $fp 4($sp)");
+
+            std::string funname=std::get<4>(r);
+            target_code_list.emplace_back("jal "+funname);
+
+            target_code_list.emplace_back("lw $fp 4($sp)");
+            target_code_list.emplace_back("lw $ra 4($sp)");
+            // free the memory occupied by ra and fp
+            target_code_list.emplace_back("addi $sp 8");
+
+            // here the return value is already in f0 or v0
+            std::string left_var=std::get<1>(r);
+            if(left_var[0]=='t') //temp
+            {
+                int left_reg_id=get_register(left_var);
+                std::string left_reg_name=reg_index2name(left_reg_id);
+
+                var2reg.insert(std::make_pair(left_var,left_reg_id));  //new temp ,register
+                reg2vars.at(left_reg_id).insert(left_var);
+
+                if(left_var[left_var.size()-1]=='t')//int
+                    target_code_list.emplace_back("move "+left_reg_name+" $v0");
+                else
+                    target_code_list.emplace_back("mov.s "+left_reg_name+" $f0");
+
+            }
+            else //user-defined
+            {
+                int offset=get_index(left_var);
+                if(left_var[left_var.size()-1]=='t')//int
+                    target_code_list.emplace_back("sw $v0 "+std::to_string(offset)+"($sp)");
+                else
+                    target_code_list.emplace_back("s.s $f0 "+std::to_string(offset)+"($sp)");
+            }
+
+
         }
 
         else if(std::get<0>(r)==9)
