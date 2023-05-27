@@ -33,7 +33,13 @@ private:
     //10:6 if x1 op x2 goto label
     //11:2 GOTO label              ok
     //12:5 x := &arr_name + index  ok
-    // total 13 types of IR
+    //13:2 BEGIN LOOP
+    //14:2 END LOOP
+    //15:2 BEGIN IF
+    //16:2 END IF
+    //17:2 BEGIN ELSE
+    //18:2 END ELSE
+    // total 19 types of IR
 
 public:
 
