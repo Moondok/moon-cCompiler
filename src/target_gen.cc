@@ -292,10 +292,14 @@ void target_gen:: parse_sym_tbl()
 
 }
 
-int target_gen::get_register()
+int target_gen::get_register(std::string var_name)
 {
-    // return value is between 0-15, on behalf on t0-t7 s0-s7
-    return 0;
+    // return value is between 0-31, on behalf on t0-t7 s0-s7 f1-f16(for float)
+    if(var_name.at(var_name.size()-1)=='t') //type int
+        return 0;
+    else  //double
+        return 16;
+    
 }
 
 void target_gen::analyze_ir()
@@ -341,10 +345,55 @@ void target_gen::analyze_ir()
             if(var2reg.find(std::get<2>(r))!=var2reg.end())
              // if the return value already in register, no need to visit memory
             {
-                
+                //$f0 and $v0 are specially for return values
+                if(std::get<2>(r)[std::get<2>(r).size()-1]=='e')//float
+                {
+                    target_code_list.emplace_back("mov.s $f0 "+reg_index2name(var2reg[std::get<2>(r)]));
+                }
+                else
+                    target_code_list.emplace_back("move $v0 "+reg_index2name(var2reg[std::get<2>(r)]));
             }
+            else  // just in the memory
+            {
+                int offset=get_index(std::get<2>(r));
+                if(std::get<2>(r)[std::get<2>(r).size()-1]=='e')//float
+                {
+                    target_code_list.emplace_back("l.s $f0 "+std::to_string(offset)+"(sp)"); // return a[0] may not works(sad)
+                }
+                else
+                    target_code_list.emplace_back("lw $v0 "+std::to_string(offset)+"(sp)");
+            }
+        }
 
+        else if(std::get<0>(r)==5)
+        {
+            std::string imm_num=std::get<2>(r).substr(1);
+            std::string var_name=std::get<1>(r);
 
+            int reg_id=get_register(var_name);
+            std::string reg_name=reg_index2name (reg_id);
+            var2reg.insert(std::make_pair(var_name,reg_id));
+
+            reg2vars.at(reg_id).insert(var_name);
+
+            if(var_name[var_name.size()-1]=='t')//int
+                target_code_list.emplace_back("li "+reg_name+" "+imm_num);
+            else
+                target_code_list.emplace_back("li.s "+reg_name+" "+imm_num);
+            
+            if(var_name[0]=='v')// user-defined variable
+            {
+                int offset=get_index(var_name);
+                if(var_name[var_name.size()-1]=='t')//int
+                {
+                    target_code_list.emplace_back("sw "+reg_name+" "+std::to_string(offset)+"(sp)");
+                }
+                else 
+                { 
+                    target_code_list.emplace_back("s.s "+reg_name+" "+std::to_string(offset)+"(sp)");
+                }
+
+            }
         }
 
         else if(std::get<0>(r)==9)
@@ -468,7 +517,7 @@ int target_gen::get_index(std::string var_name)
         int register_id;
         if(var2reg.find(var_name)==var2reg.end()) // not find
         {
-            register_id=get_register();
+            register_id=get_register(var_name);
             var2reg.insert(std::make_pair(var_name,register_id));
             reg2vars.at(register_id).insert(var_name);
         }
@@ -483,4 +532,19 @@ int target_gen::get_index(std::string var_name)
 void target_gen:: refresh_register()
 {
 
+}
+
+std::string target_gen::reg_index2name(int index)
+{
+    std::string re;
+    if(index<15)
+    {
+        if(index<=7)
+            re="$t"+std::to_string(index);
+        else
+            re="$s"+std::to_string(index);
+    }
+    else
+        re="$f"+std::to_string(index-15);
+    return re;
 }

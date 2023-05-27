@@ -57,9 +57,9 @@ private:
     //0:3 FUNCTION funcname :   ok        done
     //1:2 param name     ok
     //2:5 x := x1 op x2
-    //3:2 RETURN x     ok                pending
+    //3:2 RETURN x     ok                 done
     //4:3 ARRAY array_name length   ok   // no need to gen target code ( already in syb tbl)
-    //5:3 x := #y   ok                   pending
+    //5:3 x := #y   ok                    done
     //6:3 x := y    ok                   pending
     //7:2 arg x     ok
     //8:4 := call func    ok             pending
@@ -124,9 +124,11 @@ public:
         get_block_entries();
     }
 
-    int get_register();
+    int get_register(std::string);
 
     int get_index(std::string var_name);
+
+    std::string reg_index2name(int index);
 
     void refresh_register();
 
