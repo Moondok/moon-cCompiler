@@ -198,96 +198,222 @@ void target_gen::get_block_entries()
 }
 
 void target_gen:: parse_sym_tbl()
+{
+    std::fstream tbl_file("block_table_cache1",std::ios::in);
+    if(tbl_file.is_open()==false)
     {
-        std::fstream tbl_file("block_table_cache1",std::ios::in);
-        if(tbl_file.is_open()==false)
+        std::cerr<<"can not load symbol table.\n";
+        return ;
+    }
+    std::string tmp;
+    while(getline(tbl_file,tmp))
+    {
+        int start=0;
+        int end=tmp.find(" ");
+        std::string token=tmp.substr(start,end-start);
+        if(token=="BLOCK") // a new block
         {
-            std::cerr<<"can not load symbol table.\n";
-            return ;
-        }
-        std::string tmp;
-        while(getline(tbl_file,tmp))
-        {
-            int start=0;
-            int end=tmp.find(" ");
-            std::string token=tmp.substr(start,end-start);
-            if(token=="BLOCK") // a new block
+            start=end+1;
+            end=tmp.find(" ",start);
+            int block_id=stoi(tmp.substr(start,end-start));
+
+            start=end+1;
+            end=tmp.find(" ",start);
+            int block_size=stoi(tmp.substr(start,end-start));
+
+            while(block_id>=block2vars.size())
             {
-                start=end+1;
+                block2vars.emplace_back(std::vector<var_info>());
+            }
+            while(block_id>=block2size.size())
+                block2size.emplace_back(0);
+
+            block2size.at(block_id)=block_size;
+
+            bool read_var=true;
+            while(true)
+            {
+                getline(tbl_file,tmp);
+                start=0;
                 end=tmp.find(" ",start);
-                int block_id=stoi(tmp.substr(start,end-start));
-
-                start=end+1;
-                end=tmp.find(" ",start);
-                int block_size=stoi(tmp.substr(start,end-start));
-
-                while(block_id>=block2vars.size())
+                std::string token=tmp.substr(start,end-start);
+                if(token=="END")
+                    break; // end a block
+                else
                 {
-                    block2vars.emplace_back(std::vector<var_info>());
-                }
-                while(block_id>=block2size.size())
-                    block2size.emplace_back(0);
-
-                block2size.at(block_id)=block_size;
-
-                bool read_var=true;
-                while(true)
-                {
-                    getline(tbl_file,tmp);
-                    start=0;
-                    end=tmp.find(" ",start);
-                    std::string token=tmp.substr(start,end-start);
-                    if(token=="END")
-                        break; // end a block
-                    else
+                    if(token=="VAR")
+                        continue;
+                    else if(token=="ARR")
                     {
-                        if(token=="VAR")
-                            continue;
-                        else if(token=="ARR")
+                        read_var=false;
+                        continue;
+                    }
+                    else // a var of an array
+                    {
+                        int id=stoi(token);
+                        start=end+1;
+                        end=tmp.find(" ",start); //cuz type can be read directly from ir , we do not record here.
+                        start=end+1;
+                        end=tmp.find(" ",start);
+                        if(read_var) //
                         {
-                            read_var=false;
-                            continue;
+                            int offset=stoi(tmp.substr(start,end-start));
+                            block2vars.at(block_id).emplace_back(var_info(0,0,offset,id));
+
                         }
-                        else // a var of an array
+                        else
                         {
-                            int id=stoi(token);
-                            start=end+1;
-                            end=tmp.find(" ",start); //cuz type can be read directly from ir , we do not record here.
+                            int length=stoi(tmp.substr(start,end-start));
                             start=end+1;
                             end=tmp.find(" ",start);
-                            if(read_var) //
-                            {
-                                int offset=stoi(tmp.substr(start,end-start));
-                                block2vars.at(block_id).emplace_back(var_info(0,0,offset,id));
-
-                            }
-                            else
-                            {
-                                int length=stoi(tmp.substr(start,end-start));
-                                start=end+1;
-                                end=tmp.find(" ",start);
-                                int offset=stoi(tmp.substr(start,end-start));
-                                block2vars.at(block_id).emplace_back(var_info(1,length,offset,id));
-
-                            }
+                            int offset=stoi(tmp.substr(start,end-start));
+                            block2vars.at(block_id).emplace_back(var_info(1,length,offset,id));
 
                         }
+
                     }
                 }
-
-
             }
 
 
-            else if(token=="NUM")
-            {
-                start=end+1;
-                end=tmp.find(" ",start);
-                int num_block=stoi(tmp.substr(start,end-start));
-                break;
-            }
         }
-        
-        tbl_file.close();
+
+
+        else if(token=="NUM")
+        {
+            start=end+1;
+            end=tmp.find(" ",start);
+            int num_block=stoi(tmp.substr(start,end-start));
+            break;
+        }
+    }
+    
+    tbl_file.close();
+
+}
+
+int target_gen::get_register()
+{
+    // return value is between 0-15, on behalf on t0-t7 s0-s7
+    return 0;
+}
+
+void target_gen::analyze_ir()
+{
+    std::fstream ir_file(this->file_name,std::ios::in);
+    if(ir_file.is_open()==false)
+    {
+        std::cerr<<"can not open ir file.\n";
+        return ;
+    }
+
+    std::string ir;
+    while(getline(ir_file,ir))
+    {
+        auto r=this->parse(ir);
+
+        if(std::get<0>(r)==0) //function call
+        {
+            //notice that the params passed to current function are prepared, so there is no need to allocate memory for them
+            block_stack.push(this->num_block++);
+            //restore the 
+            target_code_list.emplace_back(std::get<1>(r)+" :");
+            target_code_list.emplace_back("addi $sp $sp -8");
+            target_code_list.emplace_back("sw $ra 8($sp)");
+            target_code_list.emplace_back("sw $fp 4($sp)");
+            target_code_list.emplace_back("move $fp $sp");// update the frame pointer
+
+            // allocate space for the variables defined in this function
+            int id=this->num_block-1;
+            int size = block2size.at(id);
+            target_code_list.emplace_back("addi $sp $sp -"+std::to_string(size)); //allocate memory for variables and arrays
+
+
+        }
+
+        else if(std::get<0>(r)==2)
+        {
+            
+        }
+
+        else if(std::get<0>(r)==9)
+        {
+            std::string labelname=std::get<1>(r);
+            target_code_list.emplace_back(labelname+" :");
+        }
+
+        else if(std::get<0>(r)==11)//goto label
+        {
+            std::string labelname=std::get<2>(r);
+            target_code_list.emplace_back("j "+labelname);
+        }
+        else if(std::get<0>(r)==13) //begin a loop!
+        {
+            block_stack.push(this->num_block++);
+            int size=block2size.at(this->num_block-1);
+            target_code_list.emplace_back("add $sp $sp -"+std::to_string(size));
+        }
+        else if(std::get<0>(r)==14)//end a loop
+        {
+            int id=block_stack.top();
+            int size=block2size.at(id);
+            target_code_list.emplace_back("add $sp $sp "+std::to_string(size));//recycle the memory
+        }
+        else if(std::get<0>(r)==15) //begin if!
+        {
+            block_stack.push(this->num_block++);
+            int size=block2size.at(this->num_block-1);
+            target_code_list.emplace_back("add $sp $sp -"+std::to_string(size));
+        }
+        else if(std::get<0>(r)==16)//end if
+        {
+            int id=block_stack.top();
+            int size=block2size.at(id);
+            target_code_list.emplace_back("add $sp $sp "+std::to_string(size));//recycle the memory
+        }
+        else if(std::get<0>(r)==17) //begin else!
+        {
+            block_stack.push(this->num_block++);
+            int size=block2size.at(this->num_block-1);
+            target_code_list.emplace_back("add $sp $sp -"+std::to_string(size));
+        }
+        else if(std::get<0>(r)==18)//end else
+        {
+            int id=block_stack.top();
+            int size=block2size.at(id);
+            target_code_list.emplace_back("add $sp $sp "+std::to_string(size));//recycle the memory
+        }
 
     }
+
+
+
+    
+
+
+
+
+
+
+
+
+    ir_file.close();
+    
+
+}
+
+void target_gen::output_target()
+{
+    std::fstream target_code_file("target.s",std::ios::out);
+    if(target_code_file.is_open()==false)
+    {
+        std::cerr<<"can not open target code file.\n";
+        return ;
+    }
+
+    for(auto &target_code:target_code_list)
+        target_code_file<<target_code<<'\n';
+
+
+    target_code_file.close();
+}
