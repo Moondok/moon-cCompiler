@@ -56,7 +56,7 @@ private:
     //type 
     //0:3 FUNCTION funcname :   ok        done
     //1:2 param name     ok               done
-    //2:5 x := x1 op x2
+    //2:5 x := x1 op x2                   done
     //3:2 RETURN x     ok                 done
     //4:3 ARRAY array_name length   ok   // no need to gen target code ( already in syb tbl)
     //5:3 x := #y   ok                    done
@@ -64,7 +64,7 @@ private:
     //7:2 arg x     ok                    done
     //8:4 := call func    ok               done
     //9:3 Label labelname :    ok          done
-    //10:6 if x1 op x2 goto label
+    //10:6 if x1 op x2 goto label          done
     //11:2 GOTO label              ok      done
     //12:5 x := &arr_name + index  ok    pending
     //13:2 BEGIN LOOP                      done

@@ -391,7 +391,8 @@ void target_gen::analyze_ir()
 
 
         }
-        else if(std::get<0>(r)==2)
+        
+        else if(std::get<0>(r)==2) //x := x1 op x2
         {
             std::string dst=std::get<1>(r);
             std::string op=std::get<4>(r);
@@ -754,6 +755,78 @@ void target_gen::analyze_ir()
         {
             std::string labelname=std::get<1>(r);
             target_code_list.emplace_back(labelname+" :");
+        }
+
+        else if(std::get<0>(r)==10) // if x1 op x2 goto label
+        {
+            // we just support int type for now, support for float is on the way
+            std::string a=std::get<2>(r);
+            std::string b=std::get<4>(r);
+            std::string op=std::get<3>(r);
+            std::string label_name=std::get<6>(r);
+
+            std::string left_reg_name;
+            std::string right_reg_name;
+            std::string target_reg_name;
+            int target_reg_id=0,left_reg_id=0,right_reg_id;
+            
+            if(a[0]=='t')// left operand is a tmp
+            {
+                left_reg_id=var2reg[a];
+                left_reg_name=reg_index2name(left_reg_id);
+
+                auto ite=var2reg.find(a);
+                var2reg.erase(ite);
+            }
+            else  // user-defined
+            {
+                left_reg_id=get_register(a); 
+                left_reg_name=reg_index2name(left_reg_id);
+
+                int offset=get_index(a);
+                reg2vars.at(left_reg_id).insert(a); // this can not be deleted for we will allocate reg later
+                target_code_list.emplace_back("lw "+left_reg_name+" "+std::to_string(offset)+"($sp)");
+            }
+
+            if(b[0]=='t')// right operand is a tmp
+            {
+                right_reg_id=var2reg[b];
+                right_reg_name=reg_index2name(left_reg_id);
+
+                auto ite=var2reg.find(b);
+                var2reg.erase(ite);
+            }
+            else  // user-defined
+            {
+                right_reg_id=get_register(b); 
+
+                int offset=get_index(b);
+                reg2vars.at(right_reg_id).insert(a);
+                target_code_list.emplace_back("lw "+right_reg_name+" "+std::to_string(offset)+"($sp)");
+            }
+
+            if(op=="==")
+                target_code_list.emplace_back("beq "+left_reg_name+" "+right_reg_name+" "+label_name);
+            else if(op=="!=")
+                target_code_list.emplace_back("bne "+left_reg_name+" "+right_reg_name+" "+label_name);
+            else if(op==">")
+            {
+                target_reg_id=get_register("tempx_int"); // tempx_int is just a placeholder for allocating register
+                target_reg_name=reg_index2name(target_reg_id);
+                target_code_list.emplace_back("slt "+target_reg_name+" "+right_reg_name+" "+left_reg_name);
+                target_code_list.emplace_back("bne $zero"+right_reg_name+" "+label_name);
+            }
+            else if(op=="<")
+            {
+                target_reg_id=get_register("tempx_int"); // tempx_int is just a placeholder for allocating register
+                target_reg_name=reg_index2name(target_reg_id);
+                target_code_list.emplace_back("slt "+target_reg_name+" "+left_reg_name+" "+right_reg_name);
+                target_code_list.emplace_back("bne $zero"+right_reg_name+" "+label_name);
+            }
+
+
+            reg2vars.at(left_reg_id).clear();
+            reg2vars.at(right_reg_id).clear();
         }
 
         else if(std::get<0>(r)==11)//goto label
