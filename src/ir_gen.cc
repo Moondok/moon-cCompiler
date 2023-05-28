@@ -1170,9 +1170,10 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
             error_infos.emplace_back(error_info("undefined array "+array_name,postfix_exp->line,postfix_exp->col));
             return var_node();
         }
-        std::string temp_name="temp"+std::to_string(ir.num_temp++);
-        var_node new_temp_var(temp_name,new_array_node.type,-1,true);
-        this->block_stack.back().var_map.insert(std::make_pair(temp_name,new_temp_var));
+
+        std::string new_var_name="var"+std::to_string(ir.num_var++);
+        var_node new_var(new_var_name,new_array_node.type,-1,true);
+        this->block_stack.back().var_map.insert(std::make_pair(new_var_name,new_var));
 
         if(new_array_node.type=="int"||new_array_node.type=="float"||new_array_node.type=="double")
         {
@@ -1202,8 +1203,13 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
             }
             //assign the value from an array
 
-            ir.add_ir(temp_name+"_"+new_array_node.type+" := &"+ir.gen_array_name(new_array_node)+" + "+temp_index_name+"_int");
-            return new_temp_var;
+            ir.add_ir(new_var_name+"_"+new_array_node.type+" := &"+ir.gen_array_name(new_array_node)+" + "+temp_index_name+"_int");
+
+            this->block_stack.back().var2memory_location.insert(std::make_pair(new_var,-1));//5-28 // note that we set the offset =-1 here, cuz this variable is inside the array
+            //note that here we add the new_var into the table , but we do not allocate new space in the block, besides , the offset of this var is unknown, only known when running the program
+            // also ,we do not allocate new space for block
+            
+            return new_var;
         }
     }
 

@@ -295,7 +295,7 @@ void target_gen:: parse_sym_tbl()
 int target_gen::get_register(std::string var_name)
 {
     // return value is between 0-31, on behalf on t0-t7 s0-s7 f1-f16(for float)
-    int reg_id;
+    int reg_id=-1;
     if(var_name.at(var_name.size()-1)=='t')
     {
         for(int i=0;i<16;i++)
@@ -316,7 +316,8 @@ int target_gen::get_register(std::string var_name)
 
             }
 
-    return -1;
+
+    return reg_id;
 }
 
 void target_gen::analyze_ir()
@@ -417,12 +418,33 @@ void target_gen::analyze_ir()
                 left_reg_id=get_register(a); 
                 left_reg_name=reg_index2name(left_reg_id);
 
-                int offset=get_index(a);
+                
                 reg2vars.at(left_reg_id).insert(a); // this can not be deleted for we will allocate reg later
-                if(a[a.size()-1]=='t')//int
-                    target_code_list.emplace_back("lw "+left_reg_name+" "+std::to_string(offset)+"($sp)");
+                
+                int offset=get_index(a);
+                if(offset==-1) // this var is an element of an array , the real offset is in the var2reg[a]
+                {
+                    int offset_reg_id=var2reg[a];
+                    std::string offset_reg_name=reg_index2name(offset_reg_id);
+                    if(a[a.size()-1]=='t')//int
+                        target_code_list.emplace_back("lw "+left_reg_name+" 0("+offset_reg_name+")");
+                    else
+                        target_code_list.emplace_back("l.s "+left_reg_name+" 0("+offset_reg_name+")");
+
+                    //here the offset reg will not be used ,free it.
+                    auto ite=var2reg.find(a);
+                    var2reg.erase(ite);
+                    reg2vars.at(offset_reg_id).clear();
+
+                }
+
                 else
-                    target_code_list.emplace_back("l.s "+left_reg_name+" "+std::to_string(offset)+"($sp)");
+                {
+                    if(a[a.size()-1]=='t')//int
+                        target_code_list.emplace_back("lw "+left_reg_name+" "+std::to_string(offset)+"($sp)");
+                    else
+                        target_code_list.emplace_back("l.s "+left_reg_name+" "+std::to_string(offset)+"($sp)");
+                }
 
             }
 
@@ -437,13 +459,31 @@ void target_gen::analyze_ir()
             else  // user-defined
             {
                 right_reg_id=get_register(b); 
+                reg2vars.at(right_reg_id).insert(b);
 
                 int offset=get_index(b);
-                reg2vars.at(right_reg_id).insert(a);
-                if(b[b.size()-1]=='t')//int
-                    target_code_list.emplace_back("lw "+right_reg_name+" "+std::to_string(offset)+"($sp)");
+                if(offset==-1) // this var is an element of an array , the real offset is in the var2reg[a]
+                {
+                    int offset_reg_id=var2reg[b];
+                    std::string offset_reg_name=reg_index2name(offset_reg_id);
+                    if(b[b.size()-1]=='t')//int
+                        target_code_list.emplace_back("lw "+right_reg_name+" 0("+offset_reg_name+")");
+                    else
+                        target_code_list.emplace_back("l.s "+right_reg_name+" 0("+offset_reg_name+")");
+
+                    //here the offset reg will not be used ,free it.
+                    auto ite=var2reg.find(b);
+                    var2reg.erase(ite);
+                    reg2vars.at(offset_reg_id).clear();
+                }
+
                 else
-                    target_code_list.emplace_back("l.s "+right_reg_name+" "+std::to_string(offset)+"($sp)");
+                {
+                    if(b[b.size()-1]=='t')//int
+                        target_code_list.emplace_back("lw "+right_reg_name+" "+std::to_string(offset)+"($sp)");
+                    else
+                        target_code_list.emplace_back("l.s "+right_reg_name+" "+std::to_string(offset)+"($sp)");
+                }
             }
             
 
@@ -509,11 +549,29 @@ void target_gen::analyze_ir()
             if(dst[0]=='v')
             {
                 int offset=get_index(dst);
-                if(dst[dst.size()-1]=='t')
-                    target_code_list.emplace_back("lw "+target_reg_name+" "+std::to_string(offset)+"($sp)");
-                else
-                    target_code_list.emplace_back("l.s "+target_reg_name+" "+std::to_string(offset)+"($sp)");
 
+                if(offset==-1) // this var is an element of an array , the real offset is in the var2reg[a]
+                {
+                    int offset_reg_id=var2reg[dst];
+                    std::string offset_reg_name=reg_index2name(offset_reg_id);
+                    if(dst[dst.size()-1]=='t')//int
+                        target_code_list.emplace_back("lw "+target_reg_name+" 0("+offset_reg_name+")");
+                    else
+                        target_code_list.emplace_back("l.s "+target_reg_name+" 0("+offset_reg_name+")");
+
+                    //here the offset reg will not be used ,free it.
+                    auto ite=var2reg.find(dst);
+                    var2reg.erase(ite);
+                    reg2vars.at(offset_reg_id).clear();
+
+                }
+                else
+                {
+                    if(dst[dst.size()-1]=='t')
+                        target_code_list.emplace_back("lw "+target_reg_name+" "+std::to_string(offset)+"($sp)");
+                    else
+                        target_code_list.emplace_back("l.s "+target_reg_name+" "+std::to_string(offset)+"($sp)");
+                }
             }
             
             // clear the occupance of reg a and reg b,no matter tmp or user-defined
@@ -524,7 +582,8 @@ void target_gen::analyze_ir()
 
         else if(std::get<0>(r)==3)  //return x
         {
-            if(var2reg.find(std::get<2>(r))!=var2reg.end())
+            std::string var_name=std::get<2>(r);
+            if(var2reg.find(var_name)!=var2reg.end())
              // if the return value already in register, no need to visit memory
             {
                 //$f0 and $v0 are specially for return values
@@ -538,12 +597,30 @@ void target_gen::analyze_ir()
             else  // just in the memory
             {
                 int offset=get_index(std::get<2>(r));
-                if(std::get<2>(r)[std::get<2>(r).size()-1]=='e')//float
+                if(offset==-1) // this var is an element of an array , the real offset is in the var2reg[a]
                 {
-                    target_code_list.emplace_back("l.s $f0 "+std::to_string(offset)+"(sp)"); // return a[0] may not works(sad)
+                    int offset_reg_id=var2reg[var_name];
+                    std::string offset_reg_name=reg_index2name(offset_reg_id);
+                    if(var_name[var_name.size()-1]=='t')//int
+                        target_code_list.emplace_back("lw $v0 0("+offset_reg_name+")");
+                    else
+                        target_code_list.emplace_back("l.s $f0 0("+offset_reg_name+")");
+
+                    //here the offset reg will not be used ,free it.
+                    auto ite=var2reg.find(var_name);
+                    var2reg.erase(ite);
+                    reg2vars.at(offset_reg_id).clear();
+
                 }
                 else
-                    target_code_list.emplace_back("lw $v0 "+std::to_string(offset)+"(sp)");
+                {
+                    if(std::get<2>(r)[std::get<2>(r).size()-1]=='e')//float
+                    {
+                        target_code_list.emplace_back("l.s $f0 "+std::to_string(offset)+"(sp)"); // return a[0] may not works(sad)
+                    }
+                    else
+                        target_code_list.emplace_back("lw $v0 "+std::to_string(offset)+"(sp)");
+                }
             }
 
             // restore the scene, when this function is invoked.
@@ -581,13 +658,31 @@ void target_gen::analyze_ir()
             if(var_name[0]=='v')// user-defined variable , do not need to load into reg
             {
                 int offset=get_index(var_name);
-                if(var_name[var_name.size()-1]=='t')//int
+                if(offset==-1) // this var is an element of an array , the real offset is in the var2reg[a]
                 {
-                    target_code_list.emplace_back("sw "+reg_name+" "+std::to_string(offset)+"($sp)");
+                    int offset_reg_id=var2reg[var_name];
+                    std::string offset_reg_name=reg_index2name(offset_reg_id);
+                    if(var_name[var_name.size()-1]=='t')//int
+                        target_code_list.emplace_back("sw "+reg_name+" 0("+offset_reg_name+")");
+                    else
+                        target_code_list.emplace_back("s.s "+reg_name+" 0("+offset_reg_name+")");
+
+                    //here the offset reg will not be used ,free it.
+                    auto ite=var2reg.find(var_name);
+                    var2reg.erase(ite);
+                    reg2vars.at(offset_reg_id).clear();
+
                 }
-                else 
-                { 
-                    target_code_list.emplace_back("s.s "+reg_name+" "+std::to_string(offset)+"($sp)");
+                else
+                {
+                    if(var_name[var_name.size()-1]=='t')//int
+                    {
+                        target_code_list.emplace_back("sw "+reg_name+" "+std::to_string(offset)+"($sp)");
+                    }
+                    else 
+                    { 
+                        target_code_list.emplace_back("s.s "+reg_name+" "+std::to_string(offset)+"($sp)");
+                    }
                 }
 
             }
@@ -604,10 +699,28 @@ void target_gen::analyze_ir()
                 if(left_value[0]=='v')
                 {
                     int offset=get_index(left_value);
-                    if(left_value[left_value.size()-1]=='t')
-                        target_code_list.emplace_back("sw "+reg_name+" "+std::to_string(offset)+"($sp)");
-                    else 
-                        target_code_list.emplace_back("s.s "+reg_name+" "+std::to_string(offset)+"($sp)");
+                    if(offset==-1) // this var is an element of an array , the real offset is in the var2reg[a]
+                    {
+                        int offset_reg_id=var2reg[left_value];
+                        std::string offset_reg_name=reg_index2name(offset_reg_id);
+                        if(left_value[left_value.size()-1]=='t')//int
+                            target_code_list.emplace_back("sw "+reg_name+" 0("+offset_reg_name+")");
+                        else
+                            target_code_list.emplace_back("s.s "+reg_name+" 0("+offset_reg_name+")");
+
+                        //here the offset reg will not be used ,free it.
+                        auto ite=var2reg.find(left_value);
+                        var2reg.erase(ite);
+                        reg2vars.at(offset_reg_id).clear();
+
+                    }
+                    else
+                    {
+                        if(left_value[left_value.size()-1]=='t')
+                            target_code_list.emplace_back("sw "+reg_name+" "+std::to_string(offset)+"($sp)");
+                        else 
+                            target_code_list.emplace_back("s.s "+reg_name+" "+std::to_string(offset)+"($sp)");
+                    }
                 }
                 else // x=tmp
                 {
@@ -638,22 +751,56 @@ void target_gen::analyze_ir()
                 reg2vars.at(reg_id).insert(right_value);  // cuz we will allocate register later, we make a mark here
                 std::string reg_name=reg_index2name (reg_id);
                 int offset=get_index(right_value);  //offset of y
+                if(offset==-1) // this var is an element of an array , the real offset is in the var2reg[a]
+                {
+                    int offset_reg_id=var2reg[right_value];
+                    std::string offset_reg_name=reg_index2name(offset_reg_id);
+                    if(right_value[right_value.size()-1]=='t')//int
+                        target_code_list.emplace_back("lw "+reg_name+" 0("+offset_reg_name+")");
+                    else
+                        target_code_list.emplace_back("l.s "+reg_name+" 0("+offset_reg_name+")");
 
-                // load y into register first
-                if(right_value[right_value.size()-1]=='t')//int
-                    target_code_list.emplace_back("lw "+reg_name+" "+std::to_string(offset)+"(sp)");
+                    //here the offset reg will not be used ,free it.
+                    auto ite=var2reg.find(right_value);
+                    var2reg.erase(ite);
+                    reg2vars.at(offset_reg_id).clear();
+
+                }
                 else
-                    target_code_list.emplace_back("l.s "+reg_name+" "+std::to_string(offset)+"(sp)");
-
+                {
+                    // load y into register first
+                    if(right_value[right_value.size()-1]=='t')//int
+                        target_code_list.emplace_back("lw "+reg_name+" "+std::to_string(offset)+"(sp)");
+                    else
+                        target_code_list.emplace_back("l.s "+reg_name+" "+std::to_string(offset)+"(sp)");
+                }
                     
 
                 if(left_value[0]=='v')
                 {
                     int offset=get_index(left_value);
-                    if(left_value[left_value.size()-1]=='t')
-                        target_code_list.emplace_back("sw "+reg_name+" "+std::to_string(offset)+"(sp)");
-                    else 
-                        target_code_list.emplace_back("s.s "+reg_name+" "+std::to_string(offset)+"(sp)");
+                    if(offset==-1) // this var is an element of an array , the real offset is in the var2reg[a]
+                    {
+                        int offset_reg_id=var2reg[left_value];
+                        std::string offset_reg_name=reg_index2name(offset_reg_id);
+                        if(left_value[left_value.size()-1]=='t')//int
+                            target_code_list.emplace_back("sw "+reg_name+" 0("+offset_reg_name+")");
+                        else
+                            target_code_list.emplace_back("s.s "+reg_name+" 0("+offset_reg_name+")");
+
+                        //here the offset reg will not be used ,free it.
+                        auto ite=var2reg.find(left_value);
+                        var2reg.erase(ite);
+                        reg2vars.at(offset_reg_id).clear();
+
+                    }
+                    else
+                    {
+                        if(left_value[left_value.size()-1]=='t')
+                            target_code_list.emplace_back("sw "+reg_name+" "+std::to_string(offset)+"(sp)");
+                        else 
+                            target_code_list.emplace_back("s.s "+reg_name+" "+std::to_string(offset)+"(sp)");
+                    }
                 }
                 else // x=tmp
                 {
@@ -700,11 +847,28 @@ void target_gen::analyze_ir()
                 int arg_reg_id=get_register4param(var_name);
                 std::string arg_reg_name=reg_index2name(arg_reg_id);
 
-                if(var_name[var_name.size()-1]=='t')
-                    target_code_list.emplace_back("lw "+arg_reg_name+" "+std::to_string(offset)+"($sp)");
+                if(offset==-1) // this var is an element of an array , the real offset is in the var2reg[a]
+                {
+                    int offset_reg_id=var2reg[var_name];
+                    std::string offset_reg_name=reg_index2name(offset_reg_id);
+                    if(var_name[var_name.size()-1]=='t')//int
+                        target_code_list.emplace_back("lw "+arg_reg_name+" 0("+offset_reg_name+")");
+                    else
+                        target_code_list.emplace_back("l.s "+arg_reg_name+" 0("+offset_reg_name+")");
+
+                    //here the offset reg will not be used ,free it.
+                    auto ite=var2reg.find(var_name);
+                    var2reg.erase(ite);
+                    reg2vars.at(offset_reg_id).clear();
+
+                }
                 else
-                    target_code_list.emplace_back("l.s "+arg_reg_name+" "+std::to_string(offset)+"($sp)");
-                
+                {
+                    if(var_name[var_name.size()-1]=='t')
+                        target_code_list.emplace_back("lw "+arg_reg_name+" "+std::to_string(offset)+"($sp)");
+                    else
+                        target_code_list.emplace_back("l.s "+arg_reg_name+" "+std::to_string(offset)+"($sp)");
+                }
                 reg2vars.at(arg_reg_id).insert(var_name);
             }
         }
@@ -742,10 +906,28 @@ void target_gen::analyze_ir()
             else //user-defined
             {
                 int offset=get_index(left_var);
-                if(left_var[left_var.size()-1]=='t')//int
-                    target_code_list.emplace_back("sw $v0 "+std::to_string(offset)+"($sp)");
+                if(offset==-1) // this var is an element of an array , the real offset is in the var2reg[a]
+                {
+                    int offset_reg_id=var2reg[left_var];
+                    std::string offset_reg_name=reg_index2name(offset_reg_id);
+                    if(left_var[left_var.size()-1]=='t')//int
+                        target_code_list.emplace_back("sw $v0 0("+offset_reg_name+")");
+                    else
+                        target_code_list.emplace_back("s.s $f0 0("+offset_reg_name+")");
+
+                    //here the offset reg will not be used ,free it.
+                    auto ite=var2reg.find(left_var);
+                    var2reg.erase(ite);
+                    reg2vars.at(offset_reg_id).clear();
+
+                }
                 else
-                    target_code_list.emplace_back("s.s $f0 "+std::to_string(offset)+"($sp)");
+                {
+                    if(left_var[left_var.size()-1]=='t')//int
+                        target_code_list.emplace_back("sw $v0 "+std::to_string(offset)+"($sp)");
+                    else
+                        target_code_list.emplace_back("s.s $f0 "+std::to_string(offset)+"($sp)");
+                }
             }
 
 
@@ -783,9 +965,24 @@ void target_gen::analyze_ir()
                 left_reg_id=get_register(a); 
                 left_reg_name=reg_index2name(left_reg_id);
 
-                int offset=get_index(a);
                 reg2vars.at(left_reg_id).insert(a); // this can not be deleted for we will allocate reg later
-                target_code_list.emplace_back("lw "+left_reg_name+" "+std::to_string(offset)+"($sp)");
+
+                int offset=get_index(a);
+                if(offset==-1) // this var is an element of an array , the real offset is in the var2reg[a]
+                {
+                    int offset_reg_id=var2reg[a];
+                    std::string offset_reg_name=reg_index2name(offset_reg_id);
+                    
+                    target_code_list.emplace_back("lw "+left_reg_name+" 0("+offset_reg_name+")");
+
+                    //here the offset reg will not be used ,free it.
+                    auto ite=var2reg.find(a);
+                    var2reg.erase(ite);
+                    reg2vars.at(offset_reg_id).clear();
+
+                }
+                else
+                    target_code_list.emplace_back("lw "+left_reg_name+" "+std::to_string(offset)+"($sp)");
             }
 
             if(b[0]=='t')// right operand is a tmp
@@ -800,9 +997,23 @@ void target_gen::analyze_ir()
             {
                 right_reg_id=get_register(b); 
 
+                reg2vars.at(right_reg_id).insert(b);
                 int offset=get_index(b);
-                reg2vars.at(right_reg_id).insert(a);
-                target_code_list.emplace_back("lw "+right_reg_name+" "+std::to_string(offset)+"($sp)");
+                if(offset==-1) // this var is an element of an array , the real offset is in the var2reg[a]
+                {
+                    int offset_reg_id=var2reg[b];
+                    std::string offset_reg_name=reg_index2name(offset_reg_id);
+                    
+                    target_code_list.emplace_back("lw "+right_reg_name+" 0("+offset_reg_name+")");
+
+                    //here the offset reg will not be used ,free it.
+                    auto ite=var2reg.find(b);
+                    var2reg.erase(ite);
+                    reg2vars.at(offset_reg_id).clear();
+
+                }
+                else
+                    target_code_list.emplace_back("lw "+right_reg_name+" "+std::to_string(offset)+"($sp)");
             }
 
             if(op=="==")
@@ -834,6 +1045,40 @@ void target_gen::analyze_ir()
             std::string labelname=std::get<2>(r);
             target_code_list.emplace_back("j "+labelname);
         }
+
+        else if(std::get<0>(r)==12)
+        {
+            std::string index_name=std::get<5>(r);
+            int index_reg_id=var2reg[index_name];
+            std::string index_reg_name=reg_index2name(index_reg_id);// this reg will restores the offset later ,so we do not free this reg
+
+            std::string arr_name=std::get<3>(r).substr(1);
+            int offset=get_index(arr_name);
+
+            std::string var_name;
+
+            // transfer the control right of reg
+            auto ite=var2reg.find(index_name); 
+            var2reg.erase(ite);
+
+            var2reg.insert(std::make_pair(var_name,index_reg_id));
+
+            reg2vars.at(index_reg_id).clear();
+            reg2vars.at(index_reg_id).insert(var_name);  // now the reg restores the offset
+
+            int tmp_reg_id=get_register("varx_int");
+            std::string tmp_reg_name=reg_index2name(tmp_reg_id);
+
+            // offset of array is in the tmp_reg
+            target_code_list.emplace_back("addi "+tmp_reg_name+" $zero "+std::to_string(offset));
+            target_code_list.emplace_back("sub "+index_reg_name+" "+tmp_reg_name+" "+index_reg_name);
+
+            // now the real offset of this element is restored in the tmp_reg!
+            target_code_list.emplace_back("add "+index_reg_name+" $sp "+index_reg_name);
+
+
+        }
+
         else if(std::get<0>(r)==13) //begin a loop!
         {
             block_stack.emplace_back(this->num_block++);
@@ -926,6 +1171,11 @@ int target_gen::get_index(std::string var_name)
                 if(var.id==id&&((var.is_arr==0&&var_name[0]=='v')||(var.is_arr==1&&var_name[0]=='a'))) 
                 {
                     offset+=block2size.at(block_stack.at(j))-var.offset;  // we trace the offset inversely!
+                    
+                    if(var.offset==-1)  // this means this var is an element of array
+                        offset=-1;
+                    else
+                        offset+=block2size.at(block_stack.at(j))-var.offset;  // we trace the offset inversely!
                     tag=true;
                     break;
                 }
@@ -982,6 +1232,7 @@ std::string target_gen::reg_index2name(int index)
 
 int target_gen::get_register4param(std::string param_name)
 {
+    int reg_id=-1;
     if(param_name[param_name.size()-1]=='t')//int
     {
         //allocate a0-a3
@@ -1002,5 +1253,5 @@ int target_gen::get_register4param(std::string param_name)
             }
     }
 
-    return -1;// no available register 4 params ,almost impossible
+    return reg_id;// no available register 4 params ,almost impossible
 }

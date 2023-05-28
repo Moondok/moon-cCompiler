@@ -6,7 +6,7 @@ int main()
     for(int i=0;i<6;++i)
     {
 
-        if(i>=5)
+        if(i>5)
         {
             int c=0; //redundant variable
             break;
