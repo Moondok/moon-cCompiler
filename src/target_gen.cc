@@ -393,7 +393,132 @@ void target_gen::analyze_ir()
         }
         else if(std::get<0>(r)==2)
         {
+            std::string dst=std::get<1>(r);
+            std::string op=std::get<4>(r);
+            std::string a=std::get<3>(r);
+            std::string b=std::get<5>(r);
+
+            std::string left_reg_name;
+            std::string right_reg_name;
+            std::string target_reg_name;
+            int target_reg_id=0,left_reg_id=0,right_reg_id;
             
+            if(a[0]=='t')// left operand is a tmp
+            {
+                left_reg_id=var2reg[a];
+                left_reg_name=reg_index2name(left_reg_id);
+
+                auto ite=var2reg.find(a);
+                var2reg.erase(ite);
+            }
+            else  // user-defined
+            {
+                left_reg_id=get_register(a); 
+                left_reg_name=reg_index2name(left_reg_id);
+
+                int offset=get_index(a);
+                reg2vars.at(left_reg_id).insert(a); // this can not be deleted for we will allocate reg later
+                if(a[a.size()-1]=='t')//int
+                    target_code_list.emplace_back("lw "+left_reg_name+" "+std::to_string(offset)+"($sp)");
+                else
+                    target_code_list.emplace_back("l.s "+left_reg_name+" "+std::to_string(offset)+"($sp)");
+
+            }
+
+            if(b[0]=='t')// right operand is a tmp
+            {
+                right_reg_id=var2reg[b];
+                right_reg_name=reg_index2name(left_reg_id);
+
+                auto ite=var2reg.find(b);
+                var2reg.erase(ite);
+            }
+            else  // user-defined
+            {
+                right_reg_id=get_register(b); 
+
+                int offset=get_index(b);
+                reg2vars.at(right_reg_id).insert(a);
+                if(b[b.size()-1]=='t')//int
+                    target_code_list.emplace_back("lw "+right_reg_name+" "+std::to_string(offset)+"($sp)");
+                else
+                    target_code_list.emplace_back("l.s "+right_reg_name+" "+std::to_string(offset)+"($sp)");
+            }
+            
+
+            if(dst[0]=='t')//tmp, we need a register
+            {
+                
+                if(var2reg.find(dst)!=var2reg.end())// already in register( in my setting, this situation is impossible
+                    target_reg_id=var2reg[dst];
+                else
+                {
+                    target_reg_id=get_register(dst);
+                    var2reg.insert(std::make_pair(dst,target_reg_id));
+                    reg2vars.at(target_reg_id).insert(dst);
+                }
+            }
+            else // user defined
+            {
+                target_reg_id=get_register(dst); // no need to register
+            }
+            target_reg_name=reg_index2name(target_reg_id);
+
+            if(op=="+")
+            {   
+                if(dst[dst.size()-1]=='t')
+                    target_code_list.emplace_back("add "+target_reg_name+" "+left_reg_name+" "+right_reg_name);
+                else
+                    target_code_list.emplace_back("add.s "+target_reg_name+" "+left_reg_name+" "+right_reg_name);
+
+            }
+            else if(op=="-")
+            {
+                if(dst[dst.size()-1]=='t')
+                    target_code_list.emplace_back("sub "+target_reg_name+" "+left_reg_name+" "+right_reg_name);
+                else
+                    target_code_list.emplace_back("sub.s "+target_reg_name+" "+left_reg_name+" "+right_reg_name);
+            }
+            else if(op=="*")
+            {
+                if(dst[dst.size()-1]=='t')
+                    target_code_list.emplace_back("mul "+target_reg_name+" "+left_reg_name+" "+right_reg_name);
+                else
+                    target_code_list.emplace_back("mul.s "+target_reg_name+" "+left_reg_name+" "+right_reg_name);
+            }
+            else if(op=="/")
+            {
+                if(dst[dst.size()-1]=='t')
+                    target_code_list.emplace_back("div "+target_reg_name+" "+left_reg_name+" "+right_reg_name);
+                else
+                    target_code_list.emplace_back("div.s "+target_reg_name+" "+left_reg_name+" "+right_reg_name);
+            }
+            else if(op=="<")
+                target_code_list.emplace_back("slt "+target_reg_name+" "+left_reg_name+" "+right_reg_name);
+            
+            else if(op==">")
+                target_code_list.emplace_back("slt "+target_reg_name+" "+right_reg_name+" "+left_reg_name);
+
+            else if(op==">>")
+                target_code_list.emplace_back("sra "+target_reg_name+" "+right_reg_name+" "+left_reg_name);
+            else if(op=="<<")
+                target_code_list.emplace_back("sll "+target_reg_name+" "+right_reg_name+" "+left_reg_name);
+            
+            //if user-defined ,write in memory
+            if(dst[0]=='v')
+            {
+                int offset=get_index(dst);
+                if(dst[dst.size()-1]=='t')
+                    target_code_list.emplace_back("lw "+target_reg_name+" "+std::to_string(offset)+"($sp)");
+                else
+                    target_code_list.emplace_back("l.s "+target_reg_name+" "+std::to_string(offset)+"($sp)");
+
+            }
+            
+            // clear the occupance of reg a and reg b,no matter tmp or user-defined
+            reg2vars.at(left_reg_id).clear();
+            reg2vars.at(right_reg_id).clear();
+
         }
 
         else if(std::get<0>(r)==3)  //return x
@@ -508,6 +633,8 @@ void target_gen::analyze_ir()
             else //y is a user-defined var
             {
                 int reg_id=get_register(right_value);
+
+                reg2vars.at(reg_id).insert(right_value);  // cuz we will allocate register later, we make a mark here
                 std::string reg_name=reg_index2name (reg_id);
                 int offset=get_index(right_value);  //offset of y
 
@@ -539,6 +666,8 @@ void target_gen::analyze_ir()
                     var2reg.insert(std::make_pair(left_value,left_reg_id));  //new temp ,register
                     reg2vars.at(left_reg_id).insert(left_value);
                 }
+
+                reg2vars.at(reg_id).clear(); //delete the occupance
             }
 
             
@@ -784,27 +913,21 @@ int target_gen::get_register4param(std::string param_name)
     {
         //allocate a0-a3
         for(int i=32;i<36;i++)
-        {
             if(reg2vars.at(i).empty()==false)
             {
                 return i;
                 break;
             }
-        }
     }
     else
     {
         for(int i=36;i<40;i++)
-        {
             if(reg2vars.at(i).empty()==false)
             {
                 return i;
                 break;
             }
-        }
     }
-
-
 
     return -1;// no available register 4 params ,almost impossible
 }
