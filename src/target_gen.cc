@@ -295,11 +295,28 @@ void target_gen:: parse_sym_tbl()
 int target_gen::get_register(std::string var_name)
 {
     // return value is between 0-31, on behalf on t0-t7 s0-s7 f1-f16(for float)
-    if(var_name.at(var_name.size()-1)=='t') //type int
-        return 0;
+    int reg_id;
+    if(var_name.at(var_name.size()-1)=='t')
+    {
+        for(int i=0;i<16;i++)
+            if(reg2vars.at(i).empty()==true)
+            {
+                reg_id=i;
+                break;
+
+            }
+    } //type int
+        
     else  //double
-        return 16;
-    
+        for(int i=16;i<32;i++)
+            if(reg2vars.at(i).empty()==true)
+            {
+                reg_id=i;
+                break;
+
+            }
+
+    return -1;
 }
 
 void target_gen::analyze_ir()
@@ -335,12 +352,51 @@ void target_gen::analyze_ir()
 
         }
 
+        else if(std::get<0>(r)==1) //param
+        {
+            std::string var_name=std::get<2>(r);
+
+            int reg_id=0;
+            if(var_name[var_name.size()-1]=='t')//int ,find in 
+            {
+                for(int i=32;i<36;i++)
+                    if(reg2vars.at(i).empty()==false)
+                    {
+                        reg_id=i;
+                        break;
+                    }
+                std::string reg_name=reg_index2name(reg_id);
+
+                int offset=get_index(var_name);
+                target_code_list.emplace_back("sw "+reg_name+" "+std::to_string(offset)+"($sp)");
+
+                reg2vars.at(reg_id).clear();
+            }
+            else
+            {
+                for(int i=36;i<40;i++) // in f17-f20
+                    if(reg2vars.at(i).empty()==false)
+                    {
+                        reg_id=i;
+                        break;
+                    }
+                std::string reg_name=reg_index2name(reg_id);
+
+                int offset=get_index(var_name);
+                target_code_list.emplace_back("s.s "+reg_name+" "+std::to_string(offset)+"($sp)");
+
+                reg2vars.at(reg_id).clear(); // the register is no longer occupied
+
+            }
+
+
+        }
         else if(std::get<0>(r)==2)
         {
             
         }
 
-        else if(std::get<0>(r)==3)
+        else if(std::get<0>(r)==3)  //return x
         {
             if(var2reg.find(std::get<2>(r))!=var2reg.end())
              // if the return value already in register, no need to visit memory
@@ -488,6 +544,41 @@ void target_gen::analyze_ir()
             
         }
 
+        else if(std::get<0>(r)==7)  //arg
+        {
+            std::string var_name=std::get<2>(r);
+            if(var_name[0]=='t')//tmp ,  find it in the register
+            {
+                int reg_id=var2reg[var_name]; 
+                std::string reg_name=reg_index2name(reg_id);
+                int arg_reg_id=get_register4param(var_name);
+                std::string arg_reg_name=reg_index2name(arg_reg_id);
+
+                if(var_name[var_name.size()-1]=='t')
+                    target_code_list.emplace_back("move "+arg_reg_name+" "+reg_name);
+                else
+                    target_code_list.emplace_back("mov.s "+arg_reg_name+" "+reg_name);
+
+                //var2reg.insert(std::make_pair(var_name,arg_reg_id));  can not do that ,cuz the key already has value reg_name
+                reg2vars.at(arg_reg_id).insert(var_name);
+
+            }
+            else// user-defined ,find it in stack
+            {
+                int offset=get_index(var_name);
+
+                int arg_reg_id=get_register4param(var_name);
+                std::string arg_reg_name=reg_index2name(arg_reg_id);
+
+                if(var_name[var_name.size()-1]=='t')
+                    target_code_list.emplace_back("lw "+arg_reg_name+" "+std::to_string(offset)+"($sp)");
+                else
+                    target_code_list.emplace_back("l.s "+arg_reg_name+" "+std::to_string(offset)+"($sp)");
+                
+                reg2vars.at(arg_reg_id).insert(var_name);
+            }
+        }
+
         else if(std::get<0>(r)==8) //x=call func
         {
             target_code_list.emplace_back("addi $sp $sp -8");
@@ -530,7 +621,7 @@ void target_gen::analyze_ir()
 
         }
 
-        else if(std::get<0>(r)==9)
+        else if(std::get<0>(r)==9)  
         {
             std::string labelname=std::get<1>(r);
             target_code_list.emplace_back(labelname+" :");
@@ -671,14 +762,49 @@ void target_gen:: refresh_register()
 std::string target_gen::reg_index2name(int index)
 {
     std::string re;
-    if(index<15)
+    if(index<16)
     {
         if(index<=7)
             re="$t"+std::to_string(index);
         else
-            re="$s"+std::to_string(index);
+            re="$s"+std::to_string(index-8);
+    }
+    else if(index<32)
+        re="$f"+std::to_string(index-15);  //f1-f16
+    else if(index<36) // register for parameters
+        re="$a"+std::to_string(index-32);
+    else 
+        re="$f"+std::to_string(index-19);
+    return re;
+}
+
+int target_gen::get_register4param(std::string param_name)
+{
+    if(param_name[param_name.size()-1]=='t')//int
+    {
+        //allocate a0-a3
+        for(int i=32;i<36;i++)
+        {
+            if(reg2vars.at(i).empty()==false)
+            {
+                return i;
+                break;
+            }
+        }
     }
     else
-        re="$f"+std::to_string(index-15);
-    return re;
+    {
+        for(int i=36;i<40;i++)
+        {
+            if(reg2vars.at(i).empty()==false)
+            {
+                return i;
+                break;
+            }
+        }
+    }
+
+
+
+    return -1;// no available register 4 params ,almost impossible
 }

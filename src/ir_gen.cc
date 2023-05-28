@@ -671,6 +671,12 @@ void ir_gen::analyze_parameter_declaration(const std::shared_ptr<AST>& root,cons
     if(definite)
     {
         ir.add_ir(ir.gen_parameter_ir(new_var));
+
+        //5-28 new added
+        this->block_stack.back().var2memory_location.insert(std::make_pair(new_var,this->block_stack.back().block_size));//5-26
+        this->block_stack.back().block_size+=4;// no matter what type the variable is, the memory takes is 4
+
+
     }
 
 }

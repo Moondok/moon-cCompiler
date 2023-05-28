@@ -45,7 +45,7 @@ private:
     std::map<std::string , int> var2reg;
 
     // a map which maps the register to vars it restores
-    std::vector<std::set<std::string>> reg2vars=std::vector<std::set<std::string>>(32);//first 16 means the number register (t0-t7 s0-s7),second 16 for float f1-f16
+    std::vector<std::set<std::string>> reg2vars=std::vector<std::set<std::string>>(40);//first 16 means the number register (t0-t7 s0-s7),second 16 for float f1-f16,then 4 a0-a3, for int param, f17-f20 for double param
 
 
     int num_block=0; //record the nesting relationships
@@ -55,13 +55,13 @@ private:
     void get_block_entries();
     //type 
     //0:3 FUNCTION funcname :   ok        done
-    //1:2 param name     ok
+    //1:2 param name     ok               done
     //2:5 x := x1 op x2
     //3:2 RETURN x     ok                 done
     //4:3 ARRAY array_name length   ok   // no need to gen target code ( already in syb tbl)
     //5:3 x := #y   ok                    done
     //6:3 x := y    ok                    done
-    //7:2 arg x     ok
+    //7:2 arg x     ok                    done
     //8:4 := call func    ok               done
     //9:3 Label labelname :    ok          done
     //10:6 if x1 op x2 goto label
@@ -125,6 +125,8 @@ public:
     }
 
     int get_register(std::string);
+
+    int get_register4param(std::string);
 
     int get_index(std::string var_name);
 
