@@ -53,6 +53,8 @@ private:
 
     std::vector<std::string> target_code_list;
 
+    int main_function_id=-1;
+
     void get_block_entries();
     //type 
     //0:3 FUNCTION funcname :   ok        done

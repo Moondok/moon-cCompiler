@@ -22,6 +22,8 @@ std::fstream ofile;
 
 IR ir;
 
+int main_function_id=-1; // this variable restores the block id which is min function
+
 ir_gen()
 {
     ofile.open("block_table_cache",std::ios::out);

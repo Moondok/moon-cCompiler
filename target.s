@@ -8,7 +8,7 @@ sw $fp 4($sp)
 move $fp $sp
 addi $sp $sp -8
 sw $a0 8($sp)
-sw $a0 4($sp)
+sw $a1 4($sp)
 lw $t0 8($sp)
 lw $t1 4($sp)
 add $t2 $t0 $t1
@@ -48,3 +48,5 @@ lw $fp 4($sp)
 lw $ra 8($sp)
 addi $sp $sp 8
 jr $ra
+li $v0 10
+syscall

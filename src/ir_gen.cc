@@ -456,6 +456,10 @@ void ir_gen::analyze_function_definition(const std::shared_ptr<AST> &root)
     
     ir.add_ir("FUNCTION "+func_name+" :");
 
+    //5-29 for system exit
+    if(func_name=="main")
+        main_function_id=ir.num_block-1;
+
     if(declarator->left_child->right_child->right_child->name=="parameter_list")
         analyze_parameter_list(declarator->left_child->right_child->right_child,func_name,true);//parameters written in blocks
     
@@ -1563,6 +1567,6 @@ void ir_gen::optimize()
 // output ir file or error file
 ir_gen:: ~ir_gen()
 {
-    ofile<<"NUM "<<ir.num_block<<" "<<'\n';
+    ofile<<"NUM "<<ir.num_block<<" "<<main_function_id<<" \n";
     ofile.close();
 }

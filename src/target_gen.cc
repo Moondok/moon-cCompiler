@@ -284,7 +284,12 @@ void target_gen:: parse_sym_tbl()
             start=end+1;
             end=tmp.find(" ",start);
             int num_block=stoi(tmp.substr(start,end-start));
+
+            start=end+1;
+            end=tmp.find(" ",start);
+            main_function_id=stoi(tmp.substr(start,end-start));
             break;
+            
         }
     }
     
@@ -335,6 +340,11 @@ void target_gen::analyze_ir()
     {
         auto r=this->parse(ir);
         std::cout<<cnt++<<'\n';
+        if(std::get<0>(r)!=1&&std::get<0>(r)!=7) //param and arg
+        {
+            for(int i=32;i<40;i++)
+                reg2vars.at(i).clear();
+        }
 
         if(std::get<0>(r)==0) //function call
         {
@@ -363,7 +373,7 @@ void target_gen::analyze_ir()
             if(var_name[var_name.size()-1]=='t')//int ,find in 
             {
                 for(int i=32;i<36;i++)
-                    if(reg2vars.at(i).empty()==true)
+                    if(reg2vars.at(i).empty()==true) //5-29
                     {
                         reg_id=i;
                         break;
@@ -373,12 +383,12 @@ void target_gen::analyze_ir()
                 int offset=get_index(var_name);
                 target_code_list.emplace_back("sw "+reg_name+" "+std::to_string(offset)+"($sp)");
 
-                reg2vars.at(reg_id).clear();
+                reg2vars.at(reg_id).insert("placeholder"); //5-29
             }
             else
             {
                 for(int i=36;i<40;i++) // in f17-f20
-                    if(reg2vars.at(i).empty()==true)
+                    if(reg2vars.at(i).empty()==true)  //5-29
                     {
                         reg_id=i;
                         break;
@@ -388,7 +398,7 @@ void target_gen::analyze_ir()
                 int offset=get_index(var_name);
                 target_code_list.emplace_back("s.s "+reg_name+" "+std::to_string(offset)+"($sp)");
 
-                reg2vars.at(reg_id).clear(); // the register is no longer occupied
+                reg2vars.at(reg_id).insert("placeholder"); //5-29
 
             }
 
@@ -637,6 +647,16 @@ void target_gen::analyze_ir()
             // free the memory occupied by ra and fp
             target_code_list.emplace_back("addi $sp $sp 8");
             target_code_list.emplace_back("jr $ra");
+
+            // add a place to exit the program
+
+            if(block_id==main_function_id)
+            {
+                target_code_list.emplace_back("li $v0 10");
+                target_code_list.emplace_back("syscall");
+            }
+            block_stack.pop_back();//5-29
+
         }
 
         else if(std::get<0>(r)==5)//x := #y
@@ -840,7 +860,7 @@ void target_gen::analyze_ir()
                     target_code_list.emplace_back("mov.s "+arg_reg_name+" "+reg_name);
 
                 //var2reg.insert(std::make_pair(var_name,arg_reg_id));  can not do that ,cuz the key already has value reg_name
-                reg2vars.at(arg_reg_id).insert(var_name);
+                reg2vars.at(arg_reg_id).insert(var_name); //5-29
 
             }
             else// user-defined ,find it in stack
@@ -872,7 +892,7 @@ void target_gen::analyze_ir()
                     else
                         target_code_list.emplace_back("l.s "+arg_reg_name+" "+std::to_string(offset)+"($sp)");
                 }
-                reg2vars.at(arg_reg_id).insert(var_name);
+                reg2vars.at(arg_reg_id).insert(var_name); //5-29
             }
         }
 
