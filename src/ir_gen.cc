@@ -1171,8 +1171,8 @@ var_node ir_gen::analyze_postfix_expression(const std::shared_ptr<AST> & postfix
             return var_node();
         }
 
-        std::string new_var_name="var"+std::to_string(ir.num_var++);
-        var_node new_var(new_var_name,new_array_node.type,-1,true);
+        std::string new_var_name="var"+std::to_string(ir.num_var);  //5-29
+        var_node new_var(new_var_name,new_array_node.type,ir.num_var++,true);  //5-29
         this->block_stack.back().var_map.insert(std::make_pair(new_var_name,new_var));
 
         if(new_array_node.type=="int"||new_array_node.type=="float"||new_array_node.type=="double")

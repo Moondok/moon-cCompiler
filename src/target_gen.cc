@@ -199,7 +199,7 @@ void target_gen::get_block_entries()
 
 void target_gen:: parse_sym_tbl()
 {
-    std::fstream tbl_file("block_table_cache1",std::ios::in);
+    std::fstream tbl_file("block_table_cache1_final",std::ios::in);
     if(tbl_file.is_open()==false)
     {
         std::cerr<<"can not load symbol table.\n";
@@ -330,16 +330,18 @@ void target_gen::analyze_ir()
     }
 
     std::string ir;
+    int cnt=0;
     while(getline(ir_file,ir))
     {
         auto r=this->parse(ir);
+        std::cout<<cnt++<<'\n';
 
         if(std::get<0>(r)==0) //function call
         {
             //notice that the params passed to current function are prepared, so there is no need to allocate memory for them
             block_stack.emplace_back(this->num_block++);
             //restore the 
-            target_code_list.emplace_back(std::get<1>(r)+" :");
+            target_code_list.emplace_back(std::get<2>(r)+" :");
             target_code_list.emplace_back("addi $sp $sp -8");
             target_code_list.emplace_back("sw $ra 8($sp)");
             target_code_list.emplace_back("sw $fp 4($sp)");
@@ -361,7 +363,7 @@ void target_gen::analyze_ir()
             if(var_name[var_name.size()-1]=='t')//int ,find in 
             {
                 for(int i=32;i<36;i++)
-                    if(reg2vars.at(i).empty()==false)
+                    if(reg2vars.at(i).empty()==true)
                     {
                         reg_id=i;
                         break;
@@ -376,7 +378,7 @@ void target_gen::analyze_ir()
             else
             {
                 for(int i=36;i<40;i++) // in f17-f20
-                    if(reg2vars.at(i).empty()==false)
+                    if(reg2vars.at(i).empty()==true)
                     {
                         reg_id=i;
                         break;
@@ -459,6 +461,7 @@ void target_gen::analyze_ir()
             else  // user-defined
             {
                 right_reg_id=get_register(b); 
+                right_reg_name=reg_index2name(right_reg_id);
                 reg2vars.at(right_reg_id).insert(b);
 
                 int offset=get_index(b);
@@ -630,15 +633,15 @@ void target_gen::analyze_ir()
             target_code_list.emplace_back("addi $sp $sp "+std::to_string(size));
             //fp and ra!
             target_code_list.emplace_back("lw $fp 4($sp)");
-            target_code_list.emplace_back("lw $ra 4($sp)");
+            target_code_list.emplace_back("lw $ra 8($sp)");
             // free the memory occupied by ra and fp
-            target_code_list.emplace_back("addi $sp 8");
-
+            target_code_list.emplace_back("addi $sp $sp 8");
+            target_code_list.emplace_back("jr $ra");
         }
 
         else if(std::get<0>(r)==5)//x := #y
         {
-            std::string imm_num=std::get<2>(r).substr(1);
+            std::string imm_num=std::get<3>(r).substr(1);
             std::string var_name=std::get<1>(r);
 
             int reg_id=get_register(var_name); 
@@ -653,7 +656,7 @@ void target_gen::analyze_ir()
             if(var_name[var_name.size()-1]=='t')//int
                 target_code_list.emplace_back("li "+reg_name+" "+imm_num);
             else
-                target_code_list.emplace_back("li.s "+reg_name+" "+imm_num);
+                target_code_list.emplace_back("li.s "+reg_name+" "+imm_num.substr(1));//5-29
             
             if(var_name[0]=='v')// user-defined variable , do not need to load into reg
             {
@@ -690,7 +693,7 @@ void target_gen::analyze_ir()
 
         else if(std::get<0>(r)==6) //x := y
         {
-            std::string right_value=std::get<2>(r);
+            std::string right_value=std::get<3>(r);
             std::string left_value=std::get<1>(r);
             if(var2reg.find(right_value)!=var2reg.end()) // we have it in register ,y is temp
             {
@@ -883,9 +886,9 @@ void target_gen::analyze_ir()
             target_code_list.emplace_back("jal "+funname);
 
             target_code_list.emplace_back("lw $fp 4($sp)");
-            target_code_list.emplace_back("lw $ra 4($sp)");
+            target_code_list.emplace_back("lw $ra 8($sp)");
             // free the memory occupied by ra and fp
-            target_code_list.emplace_back("addi $sp 8");
+            target_code_list.emplace_back("addi $sp $sp 8");
 
             // here the return value is already in f0 or v0
             std::string left_var=std::get<1>(r);
@@ -1132,6 +1135,8 @@ void target_gen::output_target()
         return ;
     }
 
+    target_code_file<<".text\n";
+    target_code_file<<".globl main\n\n";
     for(auto &target_code:target_code_list)
         target_code_file<<target_code<<'\n';
 
@@ -1147,22 +1152,22 @@ int target_gen::get_index(std::string var_name)
     int i=0,id;
     if(var_name[var_name.size()-1]=='t')
     {
-        while(var_name.at(var_name.size()-5-i)<'9'&&var_name.at(var_name.size()-5-i)>'0')
+        while(var_name.at(var_name.size()-5-i)<='9'&&var_name.at(var_name.size()-5-i)>='0')
             i++;
-        id=stoi(var_name.substr(var_name.size()-5-i,i));
+        id=stoi(var_name.substr(var_name.size()-4-i,i));
     }
     else
     {
-        while(var_name.at(var_name.size()-8-i)<'9'&&var_name.at(var_name.size()-8-i)>'0')
+        while(var_name.at(var_name.size()-8-i)<='9'&&var_name.at(var_name.size()-8-i)>='0')
             i++;
-        id=stoi(var_name.substr(var_name.size()-8-i,i));
+        id=stoi(var_name.substr(var_name.size()-7-i,i));
     }
 
     if(var_name[0]=='v'||var_name[0]=='a')//var or array;
     {
         
         bool tag=false;
-        int offset;
+        int offset=0;
         for(int j=block_stack.size()-1;j>=0;j--)
         {
             for(auto & var:block2vars.at(block_stack.at(j)))// note thatblock_stack.at(j) is the id of a block
@@ -1170,7 +1175,7 @@ int target_gen::get_index(std::string var_name)
 
                 if(var.id==id&&((var.is_arr==0&&var_name[0]=='v')||(var.is_arr==1&&var_name[0]=='a'))) 
                 {
-                    offset+=block2size.at(block_stack.at(j))-var.offset;  // we trace the offset inversely!
+                    //offset+=block2size.at(block_stack.at(j))-var.offset;  // we trace the offset inversely!
                     
                     if(var.offset==-1)  // this means this var is an element of array
                         offset=-1;
@@ -1237,7 +1242,7 @@ int target_gen::get_register4param(std::string param_name)
     {
         //allocate a0-a3
         for(int i=32;i<36;i++)
-            if(reg2vars.at(i).empty()==false)
+            if(reg2vars.at(i).empty()==true)
             {
                 return i;
                 break;
@@ -1246,7 +1251,7 @@ int target_gen::get_register4param(std::string param_name)
     else
     {
         for(int i=36;i<40;i++)
-            if(reg2vars.at(i).empty()==false)
+            if(reg2vars.at(i).empty()==true)
             {
                 return i;
                 break;

@@ -47,6 +47,7 @@ private:
     // a map which maps the register to vars it restores
     std::vector<std::set<std::string>> reg2vars=std::vector<std::set<std::string>>(40);//first 16 means the number register (t0-t7 s0-s7),second 16 for float f1-f16,then 4 a0-a3, for int param, f17-f20 for double param
 
+    //std::vector<std::string> buffer_list=std::vector<std::string>(3);  // this variable is set for array's element
 
     int num_block=0; //record the nesting relationships
 

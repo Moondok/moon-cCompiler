@@ -13,7 +13,7 @@ int main()
     int cnt=0;
     int i=0;
 
-    double arr [4];
+    int arr [4];
     for(cnt;cnt<4;cnt++)
     {
         arr[cnt]=cnt;
