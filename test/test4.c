@@ -15,4 +15,6 @@ int main()
         int tmp=frac(x);
         x--;
     }
+
+    return 0;
 }

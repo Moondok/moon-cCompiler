@@ -349,6 +349,8 @@ void target_gen::analyze_ir()
         if(std::get<0>(r)==0) //function call
         {
             //notice that the params passed to current function are prepared, so there is no need to allocate memory for them
+            if(block_stack.size()!=0)
+                block_stack.pop_back(); //last function //5-30
             block_stack.emplace_back(this->num_block++);
             //restore the 
             target_code_list.emplace_back(std::get<2>(r)+" :");
@@ -463,7 +465,7 @@ void target_gen::analyze_ir()
             if(b[0]=='t')// right operand is a tmp
             {
                 right_reg_id=var2reg[b];
-                right_reg_name=reg_index2name(left_reg_id);
+                right_reg_name=reg_index2name(right_reg_id);
 
                 auto ite=var2reg.find(b);
                 var2reg.erase(ite);
@@ -568,9 +570,9 @@ void target_gen::analyze_ir()
                     int offset_reg_id=var2reg[dst];
                     std::string offset_reg_name=reg_index2name(offset_reg_id);
                     if(dst[dst.size()-1]=='t')//int
-                        target_code_list.emplace_back("lw "+target_reg_name+" 0("+offset_reg_name+")");
+                        target_code_list.emplace_back("sw "+target_reg_name+" 0("+offset_reg_name+")");
                     else
-                        target_code_list.emplace_back("l.s "+target_reg_name+" 0("+offset_reg_name+")");
+                        target_code_list.emplace_back("s.s "+target_reg_name+" 0("+offset_reg_name+")");
 
                     //here the offset reg will not be used ,free it.
                     auto ite=var2reg.find(dst);
@@ -581,9 +583,9 @@ void target_gen::analyze_ir()
                 else
                 {
                     if(dst[dst.size()-1]=='t')
-                        target_code_list.emplace_back("lw "+target_reg_name+" "+std::to_string(offset)+"($sp)");
+                        target_code_list.emplace_back("sw "+target_reg_name+" "+std::to_string(offset)+"($sp)");
                     else
-                        target_code_list.emplace_back("l.s "+target_reg_name+" "+std::to_string(offset)+"($sp)");
+                        target_code_list.emplace_back("s.s "+target_reg_name+" "+std::to_string(offset)+"($sp)");
                 }
             }
             
@@ -599,6 +601,8 @@ void target_gen::analyze_ir()
             if(var2reg.find(var_name)!=var2reg.end())
              // if the return value already in register, no need to visit memory
             {
+                
+
                 //$f0 and $v0 are specially for return values
                 if(std::get<2>(r)[std::get<2>(r).size()-1]=='e')//float
                 {
@@ -606,6 +610,12 @@ void target_gen::analyze_ir()
                 }
                 else
                     target_code_list.emplace_back("move $v0 "+reg_index2name(var2reg[std::get<2>(r)]));
+            
+                //5-30
+                int reg_id=var2reg[var_name];
+                reg2vars.at(reg_id).clear();
+                auto ite=var2reg.find(var_name);
+                var2reg.erase(ite);
             }
             else  // just in the memory
             {
@@ -637,9 +647,24 @@ void target_gen::analyze_ir()
             }
 
             // restore the scene, when this function is invoked.
-            int block_id=block_stack.back();
-            int size=block2size[block_id];
+            // int block_id=block_stack.back();
+            // int size=block2size[block_id]; //5-30
 
+            //5-30
+
+            int size,block_id;
+            while(block_stack.size()!=1) // free the memory in if/else
+            {
+                block_id=block_stack.back();
+                block_stack.pop_back();
+                size=block2size[block_id];
+                target_code_list.emplace_back("addi $sp $sp "+std::to_string(size));
+            }
+
+            block_id=block_stack.back();
+            size=block2size[block_id];  // memory in block
+
+            //block_stack.pop_back();
             target_code_list.emplace_back("addi $sp $sp "+std::to_string(size));
             //fp and ra!
             target_code_list.emplace_back("lw $fp 4($sp)");
@@ -655,7 +680,7 @@ void target_gen::analyze_ir()
                 target_code_list.emplace_back("li $v0 10");
                 target_code_list.emplace_back("syscall");
             }
-            block_stack.pop_back();//5-29
+            //block_stack.pop_back();//5-30
 
         }
 
@@ -862,6 +887,10 @@ void target_gen::analyze_ir()
                 //var2reg.insert(std::make_pair(var_name,arg_reg_id));  can not do that ,cuz the key already has value reg_name
                 reg2vars.at(arg_reg_id).insert(var_name); //5-29
 
+                reg2vars.at(reg_id).clear();
+                auto ite=var2reg.find(var_name);
+                var2reg.erase(ite);
+
             }
             else// user-defined ,find it in stack
             {
@@ -958,7 +987,7 @@ void target_gen::analyze_ir()
 
         else if(std::get<0>(r)==9)  
         {
-            std::string labelname=std::get<1>(r);
+            std::string labelname=std::get<2>(r);
             target_code_list.emplace_back(labelname+" :");
         }
 
@@ -1011,7 +1040,7 @@ void target_gen::analyze_ir()
             if(b[0]=='t')// right operand is a tmp
             {
                 right_reg_id=var2reg[b];
-                right_reg_name=reg_index2name(left_reg_id);
+                right_reg_name=reg_index2name(right_reg_id);
 
                 auto ite=var2reg.find(b);
                 var2reg.erase(ite);
@@ -1048,14 +1077,14 @@ void target_gen::analyze_ir()
                 target_reg_id=get_register("tempx_int"); // tempx_int is just a placeholder for allocating register
                 target_reg_name=reg_index2name(target_reg_id);
                 target_code_list.emplace_back("slt "+target_reg_name+" "+right_reg_name+" "+left_reg_name);
-                target_code_list.emplace_back("bne $zero"+right_reg_name+" "+label_name);
+                target_code_list.emplace_back("bne $zero "+target_reg_name+" "+label_name);
             }
             else if(op=="<")
             {
                 target_reg_id=get_register("tempx_int"); // tempx_int is just a placeholder for allocating register
                 target_reg_name=reg_index2name(target_reg_id);
                 target_code_list.emplace_back("slt "+target_reg_name+" "+left_reg_name+" "+right_reg_name);
-                target_code_list.emplace_back("bne $zero"+right_reg_name+" "+label_name);
+                target_code_list.emplace_back("bne $zero "+target_reg_name+" "+label_name);
             }
 
 
@@ -1106,37 +1135,49 @@ void target_gen::analyze_ir()
         {
             block_stack.emplace_back(this->num_block++);
             int size=block2size.at(this->num_block-1);
-            target_code_list.emplace_back("add $sp $sp -"+std::to_string(size));
+            target_code_list.emplace_back("addi $sp $sp -"+std::to_string(size));
         }
         else if(std::get<0>(r)==14)//end a loop
         {
-            int id=block_stack.back();
-            int size=block2size.at(id);
-            target_code_list.emplace_back("add $sp $sp "+std::to_string(size));//recycle the memory
+            if(block_stack.size()>1)
+            {
+                int id=block_stack.back();
+                int size=block2size.at(id);
+                block_stack.pop_back();
+                target_code_list.emplace_back("addi $sp $sp "+std::to_string(size));//recycle the memory
+            }
         }
         else if(std::get<0>(r)==15) //begin if!
         {
             block_stack.emplace_back(this->num_block++);
             int size=block2size.at(this->num_block-1);
-            target_code_list.emplace_back("add $sp $sp -"+std::to_string(size));
+            target_code_list.emplace_back("addi $sp $sp -"+std::to_string(size));
         }
         else if(std::get<0>(r)==16)//end if
         {
+            if(block_stack.size()>1)
+            {
             int id=block_stack.back();
             int size=block2size.at(id);
-            target_code_list.emplace_back("add $sp $sp "+std::to_string(size));//recycle the memory
+            block_stack.pop_back();
+            target_code_list.emplace_back("addi $sp $sp "+std::to_string(size));//recycle the memory
+            }
         }
         else if(std::get<0>(r)==17) //begin else!
         {
             block_stack.emplace_back(this->num_block++);
             int size=block2size.at(this->num_block-1);
-            target_code_list.emplace_back("add $sp $sp -"+std::to_string(size));
+            target_code_list.emplace_back("addi $sp $sp -"+std::to_string(size));
         }
         else if(std::get<0>(r)==18)//end else
         {
+            if(block_stack.size()>1)
+            {
             int id=block_stack.back();
             int size=block2size.at(id);
-            target_code_list.emplace_back("add $sp $sp "+std::to_string(size));//recycle the memory
+            block_stack.pop_back();
+            target_code_list.emplace_back("addi $sp $sp "+std::to_string(size));//recycle the memory
+            }
         }
 
     }
