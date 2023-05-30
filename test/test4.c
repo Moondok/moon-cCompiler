@@ -9,7 +9,7 @@ int frac(int n) //test recursive function
 
 int main()
 {
-    int x=5;
+    int x=3;
     while(x>0) //test while
     {
         int tmp=frac(x);

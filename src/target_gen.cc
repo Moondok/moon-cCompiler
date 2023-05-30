@@ -199,7 +199,7 @@ void target_gen::get_block_entries()
 
 void target_gen:: parse_sym_tbl()
 {
-    std::fstream tbl_file("block_table_cache1_final",std::ios::in);
+    std::fstream tbl_file("block_table_cache2_final",std::ios::in);
     if(tbl_file.is_open()==false)
     {
         std::cerr<<"can not load symbol table.\n";
@@ -639,10 +639,10 @@ void target_gen::analyze_ir()
                 {
                     if(std::get<2>(r)[std::get<2>(r).size()-1]=='e')//float
                     {
-                        target_code_list.emplace_back("l.s $f0 "+std::to_string(offset)+"(sp)"); // return a[0] may not works(sad)
+                        target_code_list.emplace_back("l.s $f0 "+std::to_string(offset)+"($sp)"); // return a[0] may not works(sad)
                     }
                     else
-                        target_code_list.emplace_back("lw $v0 "+std::to_string(offset)+"(sp)");
+                        target_code_list.emplace_back("lw $v0 "+std::to_string(offset)+"($sp)");
                 }
             }
 
@@ -818,9 +818,9 @@ void target_gen::analyze_ir()
                 {
                     // load y into register first
                     if(right_value[right_value.size()-1]=='t')//int
-                        target_code_list.emplace_back("lw "+reg_name+" "+std::to_string(offset)+"(sp)");
+                        target_code_list.emplace_back("lw "+reg_name+" "+std::to_string(offset)+"($sp)");
                     else
-                        target_code_list.emplace_back("l.s "+reg_name+" "+std::to_string(offset)+"(sp)");
+                        target_code_list.emplace_back("l.s "+reg_name+" "+std::to_string(offset)+"($sp)");
                 }
                     
 
@@ -1048,6 +1048,7 @@ void target_gen::analyze_ir()
             else  // user-defined
             {
                 right_reg_id=get_register(b); 
+                right_reg_name=reg_index2name(right_reg_id); //5-30
 
                 reg2vars.at(right_reg_id).insert(b);
                 int offset=get_index(b);
@@ -1107,16 +1108,18 @@ void target_gen::analyze_ir()
             std::string arr_name=std::get<3>(r).substr(1);
             int offset=get_index(arr_name);
 
-            std::string var_name;
+            std::string var_name=std::get<1>(r);
 
-            // transfer the control right of reg
+            // transfer the control right of reg  5-30
             auto ite=var2reg.find(index_name); 
             var2reg.erase(ite);
 
             var2reg.insert(std::make_pair(var_name,index_reg_id));
 
             reg2vars.at(index_reg_id).clear();
+            
             reg2vars.at(index_reg_id).insert(var_name);  // now the reg restores the offset
+
 
             int tmp_reg_id=get_register("varx_int");
             std::string tmp_reg_name=reg_index2name(tmp_reg_id);
@@ -1127,6 +1130,8 @@ void target_gen::analyze_ir()
 
             // now the real offset of this element is restored in the tmp_reg!
             target_code_list.emplace_back("add "+index_reg_name+" $sp "+index_reg_name);
+
+            //5-30
 
 
         }
