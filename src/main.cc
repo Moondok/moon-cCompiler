@@ -147,6 +147,12 @@ int main(int argc,char* argv[])
 
                     //add the object code generation
                     {
+
+                        target_gen target_generator("ir.mcc");
+                        target_generator.print_parse_result();
+
+                        target_generator.analyze_ir();
+                        target_generator.output_target();
                         std::cout<<"moon-cC object code generator: object code done.   ########\n";
                     }
                 }
@@ -156,12 +162,6 @@ int main(int argc,char* argv[])
             }
         }
     }
-
-
-
-    // target_gen target_generator("ir3_oped.mcc");
-    // target_generator.print_parse_result();
-        
 
 
     
