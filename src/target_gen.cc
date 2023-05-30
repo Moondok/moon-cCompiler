@@ -199,7 +199,7 @@ void target_gen::get_block_entries()
 
 void target_gen:: parse_sym_tbl()
 {
-    std::fstream tbl_file("block_table_cache2_final",std::ios::in);
+    std::fstream tbl_file("block_table_cache",std::ios::in);
     if(tbl_file.is_open()==false)
     {
         std::cerr<<"can not load symbol table.\n";
@@ -339,7 +339,7 @@ void target_gen::analyze_ir()
     while(getline(ir_file,ir))
     {
         auto r=this->parse(ir);
-        std::cout<<cnt++<<'\n';
+        //std::cout<<cnt++<<'\n';  5-30 3:57
         if(std::get<0>(r)!=1&&std::get<0>(r)!=7) //param and arg
         {
             for(int i=32;i<40;i++)
@@ -740,7 +740,9 @@ void target_gen::analyze_ir()
         {
             std::string right_value=std::get<3>(r);
             std::string left_value=std::get<1>(r);
-            if(var2reg.find(right_value)!=var2reg.end()) // we have it in register ,y is temp
+
+            // 5-30
+            if(right_value[0]=='t') // we have it in register ,y is temp
             {
                 int reg_id=var2reg[right_value];
                 std::string reg_name=reg_index2name (reg_id);
@@ -845,9 +847,9 @@ void target_gen::analyze_ir()
                     else
                     {
                         if(left_value[left_value.size()-1]=='t')
-                            target_code_list.emplace_back("sw "+reg_name+" "+std::to_string(offset)+"(sp)");
+                            target_code_list.emplace_back("sw "+reg_name+" "+std::to_string(offset)+"($sp)");
                         else 
-                            target_code_list.emplace_back("s.s "+reg_name+" "+std::to_string(offset)+"(sp)");
+                            target_code_list.emplace_back("s.s "+reg_name+" "+std::to_string(offset)+"($sp)");
                     }
                 }
                 else // x=tmp

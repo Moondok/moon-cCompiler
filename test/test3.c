@@ -3,7 +3,7 @@ int main()
     int arr[5];
     
     // initialize the array;
-    for(int i=0;i<6;++i)
+    for(int i=0;i<5;++i)
     {
 
         if(i>5)
@@ -24,8 +24,8 @@ int main()
             if(arr[j]>arr[j+1])
             {
                 int tmp=arr[j];
-                arr[j+1]=arr[j];
-                arr[j]=tmp;
+                arr[j]=arr[j+1];
+                arr[j+1]=tmp;
             }
         }
     }

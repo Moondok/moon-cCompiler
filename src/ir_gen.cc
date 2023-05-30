@@ -1482,6 +1482,7 @@ std::string ir_gen::get_func_rtype()
 
 bool ir_gen::get_result()
 {
+   
     if(error_infos.size()!=0)
     {
         std::ofstream f("errors.log");
@@ -1499,10 +1500,14 @@ bool ir_gen::get_result()
     }
     else 
     {
+        ofile<<"NUM "<<ir.num_block<<" "<<main_function_id<<" \n";
+        ofile.close();
         optimize();
         ir.output_ir();
         return true;
     }
+
+    
 }
 
 void ir_gen::optimize()
@@ -1567,6 +1572,5 @@ void ir_gen::optimize()
 // output ir file or error file
 ir_gen:: ~ir_gen()
 {
-    ofile<<"NUM "<<ir.num_block<<" "<<main_function_id<<" \n";
-    ofile.close();
+    
 }
