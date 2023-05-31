@@ -1,6 +1,6 @@
 # moon-cC : a toy compiler with dual backends
 
-<img src="moonCC.png" style="zoom:70%" />
+<img src="moonCC.png" style="zoom:60%" />
 
 ## Brief intro
 This is a toy C compiler .It can transform a subset of ```C language``` into ```Mips``` assembly.
