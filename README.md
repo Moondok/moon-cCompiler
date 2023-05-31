@@ -1,17 +1,18 @@
-# moon-cC : a toy compiler with dual backends
+# moon-CC : a toy compiler with dual backends
 
 <img src="moonCC.png" style="zoom:60%" />
 
 ## Brief intro
-This is a toy C compiler .It can transform a subset of ```C language``` into ```Mips``` assembly.
+This is a toy C compiler .It can transform a subset of ```C language``` into ```Mips``` assembly.\
 The C language standard is [here](https://www.quut.com/c/ANSI-C-grammar-y-1999.html#labeled-statement).
+
 
 ## features
 ### generalizability
-moon-cC supports a large subset of ```C language```.It supports two data types: ```int``` and ```double``` for now. Besides , it supports arrays and function invoke.
+moon-CC supports a large subset of ```C language```.It supports two data types: ```int``` and ```double``` for now. Besides , it supports arrays and function invoke.
 
 ### ability to detect errors
-moon-cC can detect a number of ubiquitous errors when programming ,there are 5 cases and corresponding error message which will be output in ```errors.log```.More test files can be found in ```test``` folder.
+moon-CC can detect a number of ubiquitous errors when programming ,there are 5 cases and corresponding error message which will be output in ```errors.log```.More test files can be found in ```test``` folder.
 + undeclared variable
 ```C
 int main()
@@ -107,7 +108,7 @@ some error occurs at line 9 column 3 : function return_number is already defined
 
 
 
-## what moon-cC do not support for now
+## what moon-CC do not support for now
 + pointer
 + goto
 + const
