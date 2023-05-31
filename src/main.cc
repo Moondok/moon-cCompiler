@@ -7,6 +7,15 @@
 #include <ir_gen.h>
 #include <target_gen.h>
 
+
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Type.h>
+#include <llvm/Support/raw_ostream.h>
+
+//using namespace llvm;
+
 int main(int argc,char* argv[])
 {
 
@@ -85,7 +94,7 @@ int main(int argc,char* argv[])
         //lexer
         if(!std::get<0>(re))
         {
-            std::cout<<"mooc-cC lexer : some errors occur, see details in 'errors.log' .\n";
+            std::cout<<"mooc-CC lexer : some errors occur, see details in 'errors.log' .\n";
             std::ofstream o("errors.log");
             if(o.is_open()==false)
             {
@@ -100,7 +109,7 @@ int main(int argc,char* argv[])
         }
         else
         {
-            std::cout<<"moon-cC lexer : lexical analysis done.             ++++++##\n";
+            std::cout<<"moon-CC lexer : lexical analysis done.             ++++++##\n";
 
             Parser parser;
             parser.read_grammer_Yacc("./src/Ansi_Yacc_C99.txt");
@@ -113,7 +122,7 @@ int main(int argc,char* argv[])
             //syntax analysis fails
             if(std::get<0>(r)==false)
             {
-                std::cout<<"mooc-cC parser : some errors occur, see details in 'errors.log' .\n";
+                std::cout<<"mooc-CC parser : some errors occur, see details in 'errors.log' .\n";
                 std::ofstream o("errors.log");
                 if(o.is_open()==false)
                 {
@@ -130,7 +139,7 @@ int main(int argc,char* argv[])
             //syntax analysis success
             else
             {
-                std::cout<<"moon-cC parser : syntax analysis done.             ++++####\n";
+                std::cout<<"moon-CC parser : syntax analysis done.             ++++####\n";
                 if(is_dump_tree) //dump the tree 
                 {
                     std::ofstream o("tree.json");
@@ -143,7 +152,7 @@ int main(int argc,char* argv[])
                 bool ir_gen_re=ir_generator.get_result();
                 if(ir_gen_re)
                 {
-                    std::cout<<"moon-cC IR generator : semantic analysis done.     ++######\n";
+                    std::cout<<"moon-CC IR generator : semantic analysis done.     ++######\n";
 
                     //add the object code generation
                     {
@@ -153,24 +162,62 @@ int main(int argc,char* argv[])
 
                         target_generator.analyze_ir();
                         target_generator.output_target();
-                        std::cout<<"moon-cC object code generator: object code done.   ########\n";
+                        std::cout<<"moon-CC object code generator: object code done.   ########\n";
                     }
                 }
                 else   
-                    std::cout<<"mooc-cC IR generator : some errors occur, see details in 'errors.log' .\n";
+                    std::cout<<"mooc-CC IR generator : some errors occur, see details in 'errors.log' .\n";
                 
             }
         }
     }
 
 
-    
-    // parser.get_all_symbol_first();
-    // parser.get_state_group_list();
-    // parser.get_LR1_table();
 
-    // parser.print_LR1_table();
+    llvm::LLVMContext context;
+    std::unique_ptr<llvm::Module> module = std::make_unique<llvm::Module>("my_module", context);
 
-    
+    // 定义函数参数类型
+    llvm::Type* int32Type = llvm::Type::getInt32Ty(context);
+    llvm::Type* argTypes[] = {int32Type, int32Type};
+
+    // 创建函数类型
+    llvm::FunctionType* funcType = llvm::FunctionType::get(int32Type, argTypes, false);
+
+    // 创建函数对象
+    llvm::Function* func = llvm::Function::Create(
+        funcType, llvm::Function::ExternalLinkage, "add", module.get());
+
+    // 创建函数体基本块
+    llvm::BasicBlock* entry = llvm::BasicBlock::Create(context, "entry", func);
+
+    // 创建IRBuilder对象，用于生成LLVM指令
+    llvm::IRBuilder<> builder(context);
+    builder.SetInsertPoint(entry);
+
+    // 添加实现代码，调用llvm.add指令计算a+b并返回结果
+    llvm::Value* a = &*func->arg_begin();
+    llvm::Value* b = &*(func->arg_begin() + 1);
+    llvm::Value* sum = builder.CreateAdd(a, b, "sum");
+    builder.CreateRet(sum);
+
+    // 输出LLVM IR代码
+    //module->print(outs(), nullptr);
+
+    std::error_code EC;
+    llvm::raw_fd_ostream file("my_module.ll", EC);
+    if (EC) {
+        llvm::errs() << "Failed to open file: " << EC.message() << "\n";
+        return 1;
+    }
+    module->print(file, nullptr);
+        
+        // parser.get_all_symbol_first();
+        // parser.get_state_group_list();
+        // parser.get_LR1_table();
+
+        // parser.print_LR1_table();
+
+        
     return 0;
 }
